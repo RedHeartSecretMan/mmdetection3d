@@ -13,6 +13,6 @@ def add_prefix(inputs: dict, prefix: str) -> dict:
 
     outputs = dict()
     for name, value in inputs.items():
-        outputs[f'{prefix}.{name}'] = value
+        outputs[f"{prefix}.{name}"] = value
 
     return outputs

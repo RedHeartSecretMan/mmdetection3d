@@ -16,9 +16,9 @@ def bbox3d_mapping_back(bboxes, scale_factor, flip_horizontal, flip_vertical):
     """
     new_bboxes = bboxes.clone()
     if flip_horizontal:
-        new_bboxes.flip('horizontal')
+        new_bboxes.flip("horizontal")
     if flip_vertical:
-        new_bboxes.flip('vertical')
+        new_bboxes.flip("vertical")
     new_bboxes.scale(1 / scale_factor)
 
     return new_bboxes
@@ -67,11 +67,10 @@ def bbox3d2result(bboxes, scores, labels, attrs=None):
             - attrs_3d (torch.Tensor, optional): Box attributes.
     """
     result_dict = dict(
-        bboxes_3d=bboxes.to('cpu'),
-        scores_3d=scores.cpu(),
-        labels_3d=labels.cpu())
+        bboxes_3d=bboxes.to("cpu"), scores_3d=scores.cpu(), labels_3d=labels.cpu()
+    )
 
     if attrs is not None:
-        result_dict['attr_labels'] = attrs.cpu()
+        result_dict["attr_labels"] = attrs.cpu()
 
     return result_dict

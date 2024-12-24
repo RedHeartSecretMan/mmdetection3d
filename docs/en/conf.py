@@ -17,19 +17,19 @@ import sys
 
 import pytorch_sphinx_theme
 
-sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath("../../"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'MMDetection3D'
-copyright = '2020-2023, OpenMMLab'
-author = 'MMDetection3D Authors'
+project = "MMDetection3D"
+copyright = "2020-2023, OpenMMLab"
+author = "MMDetection3D Authors"
 
 # The full version, including alpha/beta/rc tags
-version_file = '../../mmdet3d/version.py'
+version_file = "../../mmdet3d/version.py"
 with open(version_file) as f:
-    exec(compile(f.read(), version_file, 'exec'))
-__version__ = locals()['__version__']
+    exec(compile(f.read(), version_file, "exec"))
+__version__ = locals()["__version__"]
 release = __version__
 
 # -- General configuration ---------------------------------------------------
@@ -38,46 +38,46 @@ release = __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx_markdown_tables',
-    'sphinx_copybutton',
-    'myst_parser',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.autodoc.typehints',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.autosectionlabel',
-    'sphinx_tabs.tabs',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx_markdown_tables",
+    "sphinx_copybutton",
+    "myst_parser",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.autodoc.typehints",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.autosectionlabel",
+    "sphinx_tabs.tabs",
 ]
-autodoc_typehints = 'description'
-autodoc_mock_imports = ['mmcv._ext']
+autodoc_typehints = "description"
+autodoc_mock_imports = ["mmcv._ext"]
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 
 # Ignore >>> when copying code
-copybutton_prompt_text = r'>>> |\.\.\. '
+copybutton_prompt_text = r">>> |\.\.\. "
 copybutton_prompt_is_regexp = True
 
-myst_enable_extensions = ['colon_fence']
+myst_enable_extensions = ["colon_fence"]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
+    ".rst": "restructuredtext",
+    ".md": "markdown",
 }
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -85,79 +85,71 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 #
 # html_theme = 'sphinx_rtd_theme'
-html_theme = 'pytorch_sphinx_theme'
+html_theme = "pytorch_sphinx_theme"
 html_theme_path = [pytorch_sphinx_theme.get_html_theme_path()]
 html_theme_options = {
-    'menu': [
+    "menu": [
+        {"name": "GitHub", "url": "https://github.com/open-mmlab/mmdetection3d"},
         {
-            'name': 'GitHub',
-            'url': 'https://github.com/open-mmlab/mmdetection3d'
-        },
-        {
-            'name':
-            'Upstream',
-            'children': [
+            "name": "Upstream",
+            "children": [
                 {
-                    'name':
-                    'MMEngine',
-                    'url':
-                    'https://github.com/open-mmlab/mmengine',
-                    'description':
-                    'Foundational library for training deep learning models'
+                    "name": "MMEngine",
+                    "url": "https://github.com/open-mmlab/mmengine",
+                    "description": "Foundational library for training deep learning models",
                 },
                 {
-                    'name': 'MMCV',
-                    'url': 'https://github.com/open-mmlab/mmcv',
-                    'description': 'Foundational library for computer vision'
+                    "name": "MMCV",
+                    "url": "https://github.com/open-mmlab/mmcv",
+                    "description": "Foundational library for computer vision",
                 },
                 {
-                    'name': 'MMDetection',
-                    'url': 'https://github.com/open-mmlab/mmdetection',
-                    'description': 'Object detection toolbox and benchmark'
+                    "name": "MMDetection",
+                    "url": "https://github.com/open-mmlab/mmdetection",
+                    "description": "Object detection toolbox and benchmark",
                 },
-            ]
+            ],
         },
     ],
     # Specify the language of shared menu
-    'menu_lang':
-    'en'
+    "menu_lang": "en",
 }
 
-language = 'en'
+language = "en"
 
-master_doc = 'index'
+master_doc = "index"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 html_css_files = [
-    'https://cdn.datatables.net/1.13.2/css/dataTables.bootstrap5.min.css',
-    'css/readthedocs.css'
+    "https://cdn.datatables.net/1.13.2/css/dataTables.bootstrap5.min.css",
+    "css/readthedocs.css",
 ]
 html_js_files = [
-    'https://cdn.datatables.net/1.13.2/js/jquery.dataTables.min.js',
-    'https://cdn.datatables.net/1.13.2/js/dataTables.bootstrap5.min.js',
-    'js/collapsed.js',
-    'js/table.js',
+    "https://cdn.datatables.net/1.13.2/js/jquery.dataTables.min.js",
+    "https://cdn.datatables.net/1.13.2/js/dataTables.bootstrap5.min.js",
+    "js/collapsed.js",
+    "js/table.js",
 ]
 
 myst_heading_anchors = 4
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'numpy': ('https://numpy.org/doc/stable', None),
-    'torch': ('https://pytorch.org/docs/stable/', None),
-    'mmcv': ('https://mmcv.readthedocs.io/en/latest/', None),
-    'mmengine': ('https://mmengine.readthedocs.io/en/latest/', None),
-    'mmdetection': ('https://mmdetection.readthedocs.io/en/latest/', None),
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
+    "mmcv": ("https://mmcv.readthedocs.io/en/latest/", None),
+    "mmengine": ("https://mmengine.readthedocs.io/en/latest/", None),
+    "mmdetection": ("https://mmdetection.readthedocs.io/en/latest/", None),
 }
 
 
 def builder_inited_handler(app):
-    subprocess.run(['./stat.py'])
+    subprocess.run(["./stat.py"])
 
 
 def setup(app):
-    app.connect('builder-inited', builder_inited_handler)
+    app.connect("builder-inited", builder_inited_handler)

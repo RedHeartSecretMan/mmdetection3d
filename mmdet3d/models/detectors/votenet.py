@@ -1,11 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, List, Optional, Union
 
+from mmdet3d.registry import MODELS
+from mmdet3d.structures import Det3DDataSample
 from mmengine.structures import InstanceData
 from torch import Tensor
 
-from mmdet3d.registry import MODELS
-from mmdet3d.structures import Det3DDataSample
 from ..test_time_augs import merge_aug_bboxes_3d
 from .single_stage import SingleStage3DDetector
 
@@ -28,14 +28,16 @@ class VoteNet(SingleStage3DDetector):
             ``pad_size_divisor``, ``pad_value``, ``mean`` and ``std``.
     """
 
-    def __init__(self,
-                 backbone: dict,
-                 bbox_head: Optional[dict] = None,
-                 train_cfg: Optional[dict] = None,
-                 test_cfg: Optional[dict] = None,
-                 init_cfg: Optional[dict] = None,
-                 data_preprocessor: Optional[dict] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        backbone: dict,
+        bbox_head: Optional[dict] = None,
+        train_cfg: Optional[dict] = None,
+        test_cfg: Optional[dict] = None,
+        init_cfg: Optional[dict] = None,
+        data_preprocessor: Optional[dict] = None,
+        **kwargs
+    ):
         super(VoteNet, self).__init__(
             backbone=backbone,
             bbox_head=bbox_head,
@@ -43,11 +45,15 @@ class VoteNet(SingleStage3DDetector):
             test_cfg=test_cfg,
             init_cfg=init_cfg,
             data_preprocessor=data_preprocessor,
-            **kwargs)
+            **kwargs
+        )
 
-    def loss(self, batch_inputs_dict: Dict[str, Union[List, Tensor]],
-             batch_data_samples: List[Det3DDataSample],
-             **kwargs) -> List[Det3DDataSample]:
+    def loss(
+        self,
+        batch_inputs_dict: Dict[str, Union[List, Tensor]],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """
         Args:
             batch_inputs_dict (dict): The model input dict which include
@@ -63,14 +69,16 @@ class VoteNet(SingleStage3DDetector):
             dict[str, Tensor]: A dictionary of loss components.
         """
         feat_dict = self.extract_feat(batch_inputs_dict)
-        points = batch_inputs_dict['points']
-        losses = self.bbox_head.loss(points, feat_dict, batch_data_samples,
-                                     **kwargs)
+        points = batch_inputs_dict["points"]
+        losses = self.bbox_head.loss(points, feat_dict, batch_data_samples, **kwargs)
         return losses
 
-    def predict(self, batch_inputs_dict: Dict[str, Optional[Tensor]],
-                batch_data_samples: List[Det3DDataSample],
-                **kwargs) -> List[Det3DDataSample]:
+    def predict(
+        self,
+        batch_inputs_dict: Dict[str, Optional[Tensor]],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """Forward of testing.
 
         Args:
@@ -96,15 +104,16 @@ class VoteNet(SingleStage3DDetector):
                     contains a tensor with shape (num_instances, 7).
         """
         feats_dict = self.extract_feat(batch_inputs_dict)
-        points = batch_inputs_dict['points']
-        results_list = self.bbox_head.predict(points, feats_dict,
-                                              batch_data_samples, **kwargs)
-        data_3d_samples = self.add_pred_to_datasample(batch_data_samples,
-                                                      results_list)
+        points = batch_inputs_dict["points"]
+        results_list = self.bbox_head.predict(
+            points, feats_dict, batch_data_samples, **kwargs
+        )
+        data_3d_samples = self.add_pred_to_datasample(batch_data_samples, results_list)
         return data_3d_samples
 
-    def aug_test(self, aug_inputs_list: List[dict],
-                 aug_data_samples: List[List[dict]], **kwargs):
+    def aug_test(
+        self, aug_inputs_list: List[dict], aug_data_samples: List[List[dict]], **kwargs
+    ):
         """Test with augmentation.
 
         Batch size always is 1 when do the augtest.
@@ -127,9 +136,10 @@ class VoteNet(SingleStage3DDetector):
             batch_inputs_dict = aug_inputs_list[aug_id]
             batch_data_samples = aug_data_samples[aug_id]
             feats_dict = self.extract_feat(batch_inputs_dict)
-            points = batch_inputs_dict['points']
-            results_list = self.bbox_head.predict(points, feats_dict,
-                                                  batch_data_samples, **kwargs)
+            points = batch_inputs_dict["points"]
+            results_list = self.bbox_head.predict(
+                points, feats_dict, batch_data_samples, **kwargs
+            )
             multi_aug_results.append(results_list[0])
         aug_input_metas_list = []
         for aug_index in range(num_augs):
@@ -138,11 +148,12 @@ class VoteNet(SingleStage3DDetector):
 
         aug_results_list = [item.to_dict() for item in multi_aug_results]
         # after merging, bboxes will be rescaled to the original image size
-        merged_results_dict = merge_aug_bboxes_3d(aug_results_list,
-                                                  aug_input_metas_list,
-                                                  self.bbox_head.test_cfg)
+        merged_results_dict = merge_aug_bboxes_3d(
+            aug_results_list, aug_input_metas_list, self.bbox_head.test_cfg
+        )
 
         merged_results = InstanceData(**merged_results_dict)
-        data_3d_samples = self.add_pred_to_datasample(batch_data_samples,
-                                                      [merged_results])
+        data_3d_samples = self.add_pred_to_datasample(
+            batch_data_samples, [merged_results]
+        )
         return data_3d_samples

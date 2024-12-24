@@ -1,7 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
 import torch
-
 from mmdet3d.registry import MODELS
 
 
@@ -14,11 +13,12 @@ def test_dla_neck():
     if torch.cuda.is_available():
         # Test DLA Neck with DCNv2 on GPU
         neck_cfg = dict(
-            type='DLANeck',
+            type="DLANeck",
             in_channels=[16, 32, 64, 128, 256, 512],
             start_level=2,
             end_level=5,
-            norm_cfg=dict(type='GN', num_groups=32))
+            norm_cfg=dict(type="GN", num_groups=32),
+        )
         neck = MODELS.build(neck_cfg)
         neck.init_weights()
         neck.cuda()
@@ -31,12 +31,13 @@ def test_dla_neck():
     else:
         # Test DLA Neck without DCNv2 on CPU
         neck_cfg = dict(
-            type='DLANeck',
+            type="DLANeck",
             in_channels=[16, 32, 64, 128, 256, 512],
             start_level=2,
             end_level=5,
-            norm_cfg=dict(type='GN', num_groups=32),
-            use_dcn=False)
+            norm_cfg=dict(type="GN", num_groups=32),
+            use_dcn=False,
+        )
         neck = MODELS.build(neck_cfg)
         neck.init_weights()
         feats = [

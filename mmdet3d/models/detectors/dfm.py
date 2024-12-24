@@ -1,10 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
-from mmdet.models.detectors import BaseDetector
-
 from mmdet3d.registry import MODELS
 from mmdet3d.structures.ops import bbox3d2result
 from mmdet3d.utils import ConfigType
+from mmdet.models.detectors import BaseDetector
 
 
 @MODELS.register_module()
@@ -41,34 +40,33 @@ class DfM(BaseDetector):
             config. Defaults to None.
     """
 
-    def __init__(self,
-                 data_preprocessor: ConfigType,
-                 backbone: ConfigType,
-                 neck: ConfigType,
-                 backbone_stereo: ConfigType,
-                 backbone_3d: ConfigType,
-                 neck_3d: ConfigType,
-                 bbox_head_3d: ConfigType,
-                 neck_2d=None,
-                 bbox_head_2d=None,
-                 depth_head_2d=None,
-                 depth_head=None,
-                 train_cfg=None,
-                 test_cfg=None,
-                 pretrained=None,
-                 init_cfg=None):
-        super().__init__(
-            data_preprocessor=data_preprocessor, init_cfg=init_cfg)
+    def __init__(
+        self,
+        data_preprocessor: ConfigType,
+        backbone: ConfigType,
+        neck: ConfigType,
+        backbone_stereo: ConfigType,
+        backbone_3d: ConfigType,
+        neck_3d: ConfigType,
+        bbox_head_3d: ConfigType,
+        neck_2d=None,
+        bbox_head_2d=None,
+        depth_head_2d=None,
+        depth_head=None,
+        train_cfg=None,
+        test_cfg=None,
+        pretrained=None,
+        init_cfg=None,
+    ):
+        super().__init__(data_preprocessor=data_preprocessor, init_cfg=init_cfg)
         self.backbone = MODELS.build(backbone)
         self.neck = MODELS.build(neck)
         if backbone_stereo is not None:
             backbone_stereo.update(cat_img_feature=self.neck.cat_img_feature)
             backbone_stereo.update(in_sem_channels=self.neck.sem_channels[-1])
             self.backbone_stereo = MODELS.build(backbone_stereo)
-            assert self.neck.cat_img_feature == \
-                self.backbone_stereo.cat_img_feature
-            assert self.neck.sem_channels[
-                -1] == self.backbone_stereo.in_sem_channels
+            assert self.neck.cat_img_feature == self.backbone_stereo.cat_img_feature
+            assert self.neck.sem_channels[-1] == self.backbone_stereo.in_sem_channels
         if backbone_3d is not None:
             self.backbone_3d = MODELS.build(backbone_3d)
         if neck_3d is not None:
@@ -91,33 +89,32 @@ class DfM(BaseDetector):
     @property
     def with_backbone_3d(self):
         """Whether the detector has a 3D backbone."""
-        return hasattr(self, 'backbone_3d') and self.backbone_3d is not None
+        return hasattr(self, "backbone_3d") and self.backbone_3d is not None
 
     @property
     def with_neck_3d(self):
         """Whether the detector has a 3D neck."""
-        return hasattr(self, 'neck_3d') and self.neck_3d is not None
+        return hasattr(self, "neck_3d") and self.neck_3d is not None
 
     @property
     def with_neck_2d(self):
         """Whether the detector has a 2D neck."""
-        return hasattr(self, 'neck_2d') and self.neck_2d is not None
+        return hasattr(self, "neck_2d") and self.neck_2d is not None
 
     @property
     def with_bbox_head_2d(self):
         """Whether the detector has a 2D detection head."""
-        return hasattr(self, 'bbox_head_2d') and self.bbox_head_2d is not None
+        return hasattr(self, "bbox_head_2d") and self.bbox_head_2d is not None
 
     @property
     def with_depth_head_2d(self):
         """Whether the detector has a image-based depth head."""
-        return hasattr(self,
-                       'depth_head_2d') and self.depth_head_2d is not None
+        return hasattr(self, "depth_head_2d") and self.depth_head_2d is not None
 
     @property
     def with_depth_head(self):
         """Whether the detector has a frustum-based depth head."""
-        return hasattr(self, 'depth_head') and self.depth_head is not None
+        return hasattr(self, "depth_head") and self.depth_head is not None
 
     def extract_feat(self, img, img_metas):
         """Feature extraction for perspective-view images.
@@ -144,25 +141,27 @@ class DfM(BaseDetector):
         prev_stereo_feat, prev_sem_feat = self.neck(prev_feats)
         # derive cur2prevs
         cur_pose = torch.tensor(
-            [img_meta['cam2global'] for img_meta in img_metas],
-            device=img.device)[:, None, :, :]  # (B, 1, 4, 4)
+            [img_meta["cam2global"] for img_meta in img_metas], device=img.device
+        )[
+            :, None, :, :
+        ]  # (B, 1, 4, 4)
         prev_poses = []
         for img_meta in img_metas:
-            sweep_img_metas = img_meta['sweep_img_metas']
-            prev_poses.append([
-                sweep_img_meta['cam2global']
-                for sweep_img_meta in sweep_img_metas
-            ])
+            sweep_img_metas = img_meta["sweep_img_metas"]
+            prev_poses.append(
+                [sweep_img_meta["cam2global"] for sweep_img_meta in sweep_img_metas]
+            )
         prev_poses = torch.tensor(prev_poses, device=img.device)
-        pad_prev_cam2global = torch.eye(4)[None, None].expand(
-            batch_size, N - 1, 4, 4).to(img.device)
-        pad_prev_cam2global[:, :, :prev_poses.shape[-2], :prev_poses.
-                            shape[-1]] = prev_poses
-        pad_cur_cam2global = torch.eye(4)[None,
-                                          None].expand(batch_size, 1, 4,
-                                                       4).to(img.device)
-        pad_cur_cam2global[:, :, :cur_pose.shape[-2], :cur_pose.
-                           shape[-1]] = cur_pose
+        pad_prev_cam2global = (
+            torch.eye(4)[None, None].expand(batch_size, N - 1, 4, 4).to(img.device)
+        )
+        pad_prev_cam2global[:, :, : prev_poses.shape[-2], : prev_poses.shape[-1]] = (
+            prev_poses
+        )
+        pad_cur_cam2global = (
+            torch.eye(4)[None, None].expand(batch_size, 1, 4, 4).to(img.device)
+        )
+        pad_cur_cam2global[:, :, : cur_pose.shape[-2], : cur_pose.shape[-1]] = cur_pose
         # (B, N-1, 4, 4) * (B, 1, 4, 4) -> (B, N-1, 4, 4)
         # torch.linalg.solve is faster and more numerically stable
         # than torch.matmul(torch.linalg.inv(A), B)
@@ -171,29 +170,25 @@ class DfM(BaseDetector):
         # while torch.linalg.inv can not
         cur2prevs = torch.linalg.solve(pad_prev_cam2global, pad_cur_cam2global)
         for meta_idx, img_meta in enumerate(img_metas):
-            img_meta['cur2prevs'] = cur2prevs[meta_idx]
+            img_meta["cur2prevs"] = cur2prevs[meta_idx]
         # stereo backbone for depth estimation
         # volume_feat: (batch_size, Cv, Nz, Ny, Nx)
-        volume_feat = self.backbone_stereo(cur_stereo_feat, prev_stereo_feat,
-                                           img_metas, cur_sem_feat)
+        volume_feat = self.backbone_stereo(
+            cur_stereo_feat, prev_stereo_feat, img_metas, cur_sem_feat
+        )
         # height compression
         _, Cv, Nz, Ny, Nx = volume_feat.shape
         bev_feat = volume_feat.view(batch_size, Cv * Nz, Ny, Nx)
         bev_feat_prehg, bev_feat = self.neck_3d(bev_feat)
         return bev_feat
 
-    def forward_train(self,
-                      img,
-                      img_metas,
-                      gt_bboxes_3d,
-                      gt_labels_3d,
-                      depth_img=None,
-                      **kwargs):
+    def forward_train(
+        self, img, img_metas, gt_bboxes_3d, gt_labels_3d, depth_img=None, **kwargs
+    ):
         """Forward function for training."""
         bev_feat = self.extract_feat(img, img_metas)
         outs = self.bbox_head_3d([bev_feat])
-        losses = self.bbox_head_3d.loss(*outs, gt_bboxes_3d, gt_labels_3d,
-                                        img_metas)
+        losses = self.bbox_head_3d.loss(*outs, gt_bboxes_3d, gt_labels_3d, img_metas)
         # TODO: loss_dense_depth, loss_2d, loss_imitation
         return losses
 
@@ -223,7 +218,7 @@ class DfM(BaseDetector):
         ]
         # add pseudo-lidar label to each pred_dict for post-processing
         for bbox_result in bbox_results:
-            bbox_result['pseudo_lidar'] = True
+            bbox_result["pseudo_lidar"] = True
         return bbox_results
 
     def aug_test(self, imgs, img_metas, **kwargs):

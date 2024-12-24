@@ -5,7 +5,6 @@ from unittest import TestCase
 import numpy as np
 import pytest
 import torch
-
 from mmdet3d.structures import PointData
 
 
@@ -27,7 +26,7 @@ class TestPointData(TestCase):
             point_data._data_fields = 1
 
         point_data.keypoints = torch.rand((5, 2))
-        assert 'keypoints' in point_data
+        assert "keypoints" in point_data
 
     def test_getitem(self):
         point_data = PointData()
@@ -57,7 +56,7 @@ class TestPointData(TestCase):
             point_data[item.bool()]
 
         # test LongTensor
-        long_tensor = torch.randint(5, (2, ))
+        long_tensor = torch.randint(5, (2,))
         long_index_point_data = point_data[long_tensor]
         assert len(long_index_point_data) == len(long_tensor)
 

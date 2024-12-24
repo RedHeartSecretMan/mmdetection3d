@@ -2,13 +2,15 @@
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Union
 
+from mmdet3d.structures import PointData
+from mmdet3d.structures.det3d_data_sample import (
+    ForwardResults,
+    OptSampleList,
+    SampleList,
+)
+from mmdet3d.utils import OptConfigType, OptMultiConfig
 from mmengine.model import BaseModel
 from torch import Tensor
-
-from mmdet3d.structures import PointData
-from mmdet3d.structures.det3d_data_sample import (ForwardResults,
-                                                  OptSampleList, SampleList)
-from mmdet3d.utils import OptConfigType, OptMultiConfig
 
 
 class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
@@ -23,33 +25,35 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
            initialization. Defaults to None.
     """
 
-    def __init__(self,
-                 data_preprocessor: OptConfigType = None,
-                 init_cfg: OptMultiConfig = None):
+    def __init__(
+        self, data_preprocessor: OptConfigType = None, init_cfg: OptMultiConfig = None
+    ):
         super(Base3DSegmentor, self).__init__(
-            data_preprocessor=data_preprocessor, init_cfg=init_cfg)
+            data_preprocessor=data_preprocessor, init_cfg=init_cfg
+        )
 
     @property
     def with_neck(self) -> bool:
         """bool: Whether the segmentor has neck."""
-        return hasattr(self, 'neck') and self.neck is not None
+        return hasattr(self, "neck") and self.neck is not None
 
     @property
     def with_auxiliary_head(self) -> bool:
         """bool: Whether the segmentor has auxiliary head."""
-        return hasattr(self,
-                       'auxiliary_head') and self.auxiliary_head is not None
+        return hasattr(self, "auxiliary_head") and self.auxiliary_head is not None
 
     @property
     def with_decode_head(self) -> bool:
         """bool: Whether the segmentor has decode head."""
-        return hasattr(self, 'decode_head') and self.decode_head is not None
+        return hasattr(self, "decode_head") and self.decode_head is not None
 
     @property
     def with_regularization_loss(self) -> bool:
         """bool: Whether the segmentor has regularization loss for weight."""
-        return hasattr(self, 'loss_regularization') and \
-            self.loss_regularization is not None
+        return (
+            hasattr(self, "loss_regularization")
+            and self.loss_regularization is not None
+        )
 
     @abstractmethod
     def extract_feat(self, batch_inputs: Tensor) -> dict:
@@ -57,16 +61,19 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def encode_decode(self, batch_inputs: Tensor,
-                      batch_data_samples: SampleList) -> Tensor:
+    def encode_decode(
+        self, batch_inputs: Tensor, batch_data_samples: SampleList
+    ) -> Tensor:
         """Placeholder for encode images with backbone and decode into a
         semantic segmentation map of the same size as input."""
         pass
 
-    def forward(self,
-                inputs: Union[dict, List[dict]],
-                data_samples: OptSampleList = None,
-                mode: str = 'tensor') -> ForwardResults:
+    def forward(
+        self,
+        inputs: Union[dict, List[dict]],
+        data_samples: OptSampleList = None,
+        mode: str = "tensor",
+    ) -> ForwardResults:
         """The unified entry for a forward process in both training and test.
 
         The method should accept three modes: "tensor", "predict" and "loss":
@@ -98,33 +105,34 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
             - If ``mode="predict"``, return a list of :obj:`Det3DDataSample`.
             - If ``mode="loss"``, return a dict of tensor.
         """
-        if mode == 'loss':
+        if mode == "loss":
             return self.loss(inputs, data_samples)
-        elif mode == 'predict':
+        elif mode == "predict":
             return self.predict(inputs, data_samples)
-        elif mode == 'tensor':
+        elif mode == "tensor":
             return self._forward(inputs, data_samples)
         else:
-            raise RuntimeError(f'Invalid mode "{mode}". '
-                               'Only supports loss, predict and tensor mode')
+            raise RuntimeError(
+                f'Invalid mode "{mode}". ' "Only supports loss, predict and tensor mode"
+            )
 
     @abstractmethod
-    def loss(self, batch_inputs: dict,
-             batch_data_samples: SampleList) -> Dict[str, Tensor]:
+    def loss(
+        self, batch_inputs: dict, batch_data_samples: SampleList
+    ) -> Dict[str, Tensor]:
         """Calculate losses from a batch of inputs and data samples."""
         pass
 
     @abstractmethod
-    def predict(self, batch_inputs: dict,
-                batch_data_samples: SampleList) -> SampleList:
+    def predict(self, batch_inputs: dict, batch_data_samples: SampleList) -> SampleList:
         """Predict results from a batch of inputs and data samples with post-
         processing."""
         pass
 
     @abstractmethod
-    def _forward(self,
-                 batch_inputs: dict,
-                 batch_data_samples: OptSampleList = None) -> Tensor:
+    def _forward(
+        self, batch_inputs: dict, batch_data_samples: OptSampleList = None
+    ) -> Tensor:
         """Network forward process.
 
         Usually includes backbone, neck and head forward without any post-
@@ -132,8 +140,9 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
         """
         pass
 
-    def postprocess_result(self, seg_logits_list: List[Tensor],
-                           batch_data_samples: SampleList) -> SampleList:
+    def postprocess_result(
+        self, seg_logits_list: List[Tensor], batch_data_samples: SampleList
+    ) -> SampleList:
         """Convert results list to `Det3DDataSample`.
 
         Args:
@@ -156,10 +165,10 @@ class Base3DSegmentor(BaseModel, metaclass=ABCMeta):
         for i in range(len(seg_logits_list)):
             seg_logits = seg_logits_list[i]
             seg_pred = seg_logits.argmax(dim=0)
-            batch_data_samples[i].set_data({
-                'pts_seg_logits':
-                PointData(**{'pts_seg_logits': seg_logits}),
-                'pred_pts_seg':
-                PointData(**{'pts_semantic_mask': seg_pred})
-            })
+            batch_data_samples[i].set_data(
+                {
+                    "pts_seg_logits": PointData(**{"pts_seg_logits": seg_logits}),
+                    "pred_pts_seg": PointData(**{"pts_semantic_mask": seg_pred}),
+                }
+            )
         return batch_data_samples

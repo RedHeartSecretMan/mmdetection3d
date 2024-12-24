@@ -14,13 +14,12 @@ import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
 from mmcv.cnn import build_norm_layer
-from mmcv.cnn.bricks.transformer import (BaseTransformerLayer,
-                                         TransformerLayerSequence)
-from mmengine.model import BaseModule
-from mmengine.model.weight_init import xavier_init
+from mmcv.cnn.bricks.transformer import BaseTransformerLayer, TransformerLayerSequence
 
 # from mmcv.utils import deprecated_api_warning
 from mmdet3d.registry import MODELS, TASK_UTILS
+from mmengine.model import BaseModule
+from mmengine.model.weight_init import xavier_init
 
 
 @MODELS.register_module()
@@ -56,8 +55,8 @@ class PETRTransformer(BaseModule):
     def init_weights(self):
         # follow the official DETR to init parameters
         for m in self.modules():
-            if hasattr(m, 'weight') and m.weight.dim() > 1:
-                xavier_init(m, distribution='uniform')
+            if hasattr(m, "weight") and m.weight.dim() > 1:
+                xavier_init(m, distribution="uniform")
         self._is_init = True
 
     def forward(self, x, mask, query_embed, pos_embed, reg_branch=None):
@@ -81,13 +80,15 @@ class PETRTransformer(BaseModule):
                       [bs, embed_dims, h, w].
         """
         bs, n, c, h, w = x.shape
-        memory = x.permute(1, 3, 4, 0,
-                           2).reshape(-1, bs,
-                                      c)  # [bs, n, c, h, w] -> [n*h*w, bs, c]
+        memory = x.permute(1, 3, 4, 0, 2).reshape(
+            -1, bs, c
+        )  # [bs, n, c, h, w] -> [n*h*w, bs, c]
         pos_embed = pos_embed.permute(1, 3, 4, 0, 2).reshape(
-            -1, bs, c)  # [bs, n, c, h, w] -> [n*h*w, bs, c]
+            -1, bs, c
+        )  # [bs, n, c, h, w] -> [n*h*w, bs, c]
         query_embed = query_embed.unsqueeze(1).repeat(
-            1, bs, 1)  # [num_query, dim] -> [num_query, bs, dim]
+            1, bs, 1
+        )  # [num_query, dim] -> [num_query, bs, dim]
         mask = mask.view(bs, -1)  # [bs, n, h, w] -> [bs, n*h*w]
         target = torch.zeros_like(query_embed)
 
@@ -139,17 +140,13 @@ class PETRDNTransformer(BaseModule):
     def init_weights(self):
         # follow the official DETR to init parameters
         for m in self.modules():
-            if hasattr(m, 'weight') and m.weight.dim() > 1:
-                xavier_init(m, distribution='uniform')
+            if hasattr(m, "weight") and m.weight.dim() > 1:
+                xavier_init(m, distribution="uniform")
         self._is_init = True
 
-    def forward(self,
-                x,
-                mask,
-                query_embed,
-                pos_embed,
-                attn_masks=None,
-                reg_branch=None):
+    def forward(
+        self, x, mask, query_embed, pos_embed, attn_masks=None, reg_branch=None
+    ):
         """Forward function for `Transformer`.
         Args:
             x (Tensor): Input query with shape [bs, c, h, w] where
@@ -170,13 +167,15 @@ class PETRDNTransformer(BaseModule):
                       [bs, embed_dims, h, w].
         """
         bs, n, c, h, w = x.shape
-        memory = x.permute(1, 3, 4, 0,
-                           2).reshape(-1, bs,
-                                      c)  # [bs, n, c, h, w] -> [n*h*w, bs, c]
+        memory = x.permute(1, 3, 4, 0, 2).reshape(
+            -1, bs, c
+        )  # [bs, n, c, h, w] -> [n*h*w, bs, c]
         pos_embed = pos_embed.permute(1, 3, 4, 0, 2).reshape(
-            -1, bs, c)  # [bs, n, c, h, w] -> [n*h*w, bs, c]
+            -1, bs, c
+        )  # [bs, n, c, h, w] -> [n*h*w, bs, c]
         query_embed = query_embed.transpose(
-            0, 1)  # [num_query, dim] -> [num_query, bs, dim]
+            0, 1
+        )  # [num_query, dim] -> [num_query, bs, dim]
         mask = mask.view(bs, -1)  # [bs, n, h, w] -> [bs, n*h*w]
         target = torch.zeros_like(query_embed)
         # out_dec: [num_layers, num_query, bs, dim]
@@ -218,16 +217,18 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
             Default：2.
     """
 
-    def __init__(self,
-                 attn_cfgs,
-                 feedforward_channels,
-                 ffn_dropout=0.0,
-                 operation_order=None,
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 ffn_num_fcs=2,
-                 with_cp=True,
-                 **kwargs):
+    def __init__(
+        self,
+        attn_cfgs,
+        feedforward_channels,
+        ffn_dropout=0.0,
+        operation_order=None,
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        ffn_num_fcs=2,
+        with_cp=True,
+        **kwargs,
+    ):
         super(PETRTransformerDecoderLayer, self).__init__(
             attn_cfgs=attn_cfgs,
             feedforward_channels=feedforward_channels,
@@ -236,10 +237,10 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
             act_cfg=act_cfg,
             norm_cfg=norm_cfg,
             ffn_num_fcs=ffn_num_fcs,
-            **kwargs)
+            **kwargs,
+        )
         assert len(operation_order) == 6
-        assert set(operation_order) == set(
-            ['self_attn', 'norm', 'cross_attn', 'ffn'])
+        assert set(operation_order) == set(["self_attn", "norm", "cross_attn", "ffn"])
         self.use_checkpoint = with_cp
 
     def _forward(
@@ -271,16 +272,18 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
 
         return x
 
-    def forward(self,
-                query,
-                key=None,
-                value=None,
-                query_pos=None,
-                key_pos=None,
-                attn_masks=None,
-                query_key_padding_mask=None,
-                key_padding_mask=None,
-                **kwargs):
+    def forward(
+        self,
+        query,
+        key=None,
+        value=None,
+        query_pos=None,
+        key_pos=None,
+        attn_masks=None,
+        query_key_padding_mask=None,
+        key_padding_mask=None,
+        **kwargs,
+    ):
         """Forward function for `TransformerCoder`.
 
         Returns:
@@ -308,7 +311,8 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
                 key_pos=key_pos,
                 attn_masks=attn_masks,
                 query_key_padding_mask=query_key_padding_mask,
-                key_padding_mask=key_padding_mask)
+                key_padding_mask=key_padding_mask,
+            )
         return x
 
 
@@ -334,48 +338,54 @@ class PETRMultiheadAttention(BaseModule):
              Default to False.
     """
 
-    def __init__(self,
-                 embed_dims,
-                 num_heads,
-                 attn_drop=0.,
-                 proj_drop=0.,
-                 dropout_layer=dict(type='Dropout', drop_prob=0.),
-                 init_cfg=None,
-                 batch_first=False,
-                 **kwargs):
+    def __init__(
+        self,
+        embed_dims,
+        num_heads,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        dropout_layer=dict(type="Dropout", drop_prob=0.0),
+        init_cfg=None,
+        batch_first=False,
+        **kwargs,
+    ):
         super(PETRMultiheadAttention, self).__init__(init_cfg)
-        if 'dropout' in kwargs:
+        if "dropout" in kwargs:
             warnings.warn(
-                'The arguments `dropout` in MultiheadAttention '
-                'has been deprecated, now you can separately '
-                'set `attn_drop`(float), proj_drop(float), '
-                'and `dropout_layer`(dict) ', DeprecationWarning)
-            attn_drop = kwargs['dropout']
-            dropout_layer['drop_prob'] = kwargs.pop('dropout')
+                "The arguments `dropout` in MultiheadAttention "
+                "has been deprecated, now you can separately "
+                "set `attn_drop`(float), proj_drop(float), "
+                "and `dropout_layer`(dict) ",
+                DeprecationWarning,
+            )
+            attn_drop = kwargs["dropout"]
+            dropout_layer["drop_prob"] = kwargs.pop("dropout")
 
         self.embed_dims = embed_dims
         self.num_heads = num_heads
         self.batch_first = batch_first
 
-        self.attn = nn.MultiheadAttention(embed_dims, num_heads, attn_drop,
-                                          **kwargs)
+        self.attn = nn.MultiheadAttention(embed_dims, num_heads, attn_drop, **kwargs)
 
         self.proj_drop = nn.Dropout(proj_drop)
-        self.dropout_layer = MODELS.build(
-            dropout_layer) if dropout_layer else nn.Identity()
+        self.dropout_layer = (
+            MODELS.build(dropout_layer) if dropout_layer else nn.Identity()
+        )
 
     # @deprecated_api_warning({'residual': 'identity'},
     #                         cls_name='MultiheadAttention')
-    def forward(self,
-                query,
-                key=None,
-                value=None,
-                identity=None,
-                query_pos=None,
-                key_pos=None,
-                attn_mask=None,
-                key_padding_mask=None,
-                **kwargs):
+    def forward(
+        self,
+        query,
+        key=None,
+        value=None,
+        identity=None,
+        query_pos=None,
+        key_pos=None,
+        attn_mask=None,
+        key_padding_mask=None,
+        **kwargs,
+    ):
         """Forward function for `MultiheadAttention`.
 
         **kwargs allow passing a more general data flow when combining
@@ -426,8 +436,10 @@ class PETRMultiheadAttention(BaseModule):
                 if query_pos.shape == key.shape:
                     key_pos = query_pos
                 else:
-                    warnings.warn(f'position encoding of key is'
-                                  f'missing in {self.__class__.__name__}.')
+                    warnings.warn(
+                        f"position encoding of key is"
+                        f"missing in {self.__class__.__name__}."
+                    )
         if query_pos is not None:
             query = query + query_pos
         if key_pos is not None:
@@ -449,7 +461,8 @@ class PETRMultiheadAttention(BaseModule):
             key=key,
             value=value,
             attn_mask=attn_mask,
-            key_padding_mask=key_padding_mask)[0]
+            key_padding_mask=key_padding_mask,
+        )[0]
 
         if self.batch_first:
             out = out.transpose(0, 1)
@@ -466,15 +479,20 @@ class PETRTransformerEncoder(TransformerLayerSequence):
             `LN`. Only used when `self.pre_norm` is `True`
     """
 
-    def __init__(self, *args, post_norm_cfg=dict(type='LN'), **kwargs):
+    def __init__(self, *args, post_norm_cfg=dict(type="LN"), **kwargs):
         super(PETRTransformerEncoder, self).__init__(*args, **kwargs)
         if post_norm_cfg is not None:
-            self.post_norm = TASK_UTILS.build(
-                post_norm_cfg, self.embed_dims)[1] if self.pre_norm else None
+            self.post_norm = (
+                TASK_UTILS.build(post_norm_cfg, self.embed_dims)[1]
+                if self.pre_norm
+                else None
+            )
         else:
-            assert not self.pre_norm, f'Use prenorm in ' \
-                                      f'{self.__class__.__name__},' \
-                                      f'Please specify post_norm_cfg'
+            assert not self.pre_norm, (
+                f"Use prenorm in "
+                f"{self.__class__.__name__},"
+                f"Please specify post_norm_cfg"
+            )
             self.post_norm = None
 
     def forward(self, *args, **kwargs):
@@ -499,17 +517,14 @@ class PETRTransformerDecoder(TransformerLayerSequence):
             `LN`.
     """
 
-    def __init__(self,
-                 *args,
-                 post_norm_cfg=dict(type='LN'),
-                 return_intermediate=False,
-                 **kwargs):
+    def __init__(
+        self, *args, post_norm_cfg=dict(type="LN"), return_intermediate=False, **kwargs
+    ):
 
         super(PETRTransformerDecoder, self).__init__(*args, **kwargs)
         self.return_intermediate = return_intermediate
         if post_norm_cfg is not None:
-            self.post_norm = build_norm_layer(post_norm_cfg,
-                                              self.embed_dims)[1]
+            self.post_norm = build_norm_layer(post_norm_cfg, self.embed_dims)[1]
         else:
             self.post_norm = None
 

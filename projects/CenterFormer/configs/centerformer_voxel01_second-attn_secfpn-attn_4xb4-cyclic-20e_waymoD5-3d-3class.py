@@ -1,6 +1,7 @@
-_base_ = ['../../../configs/_base_/default_runtime.py']
+_base_ = ["../../../configs/_base_/default_runtime.py"]
 custom_imports = dict(
-    imports=['projects.CenterFormer.centerformer'], allow_failed_imports=False)
+    imports=["projects.CenterFormer.centerformer"], allow_failed_imports=False
+)
 
 # model settings
 # Voxel size for voxel encoder
@@ -9,39 +10,42 @@ custom_imports = dict(
 # keys in the config.
 voxel_size = [0.1, 0.1, 0.15]
 point_cloud_range = [-75.2, -75.2, -2, 75.2, 75.2, 4]
-class_names = ['Car', 'Pedestrian', 'Cyclist']
-tasks = [dict(num_class=3, class_names=['car', 'pedestrian', 'cyclist'])]
+class_names = ["Car", "Pedestrian", "Cyclist"]
+tasks = [dict(num_class=3, class_names=["car", "pedestrian", "cyclist"])]
 metainfo = dict(classes=class_names)
 input_modality = dict(use_lidar=True, use_camera=False)
 backend_args = None
 
 model = dict(
-    type='CenterFormer',
+    type="CenterFormer",
     data_preprocessor=dict(
-        type='Det3DDataPreprocessor',
+        type="Det3DDataPreprocessor",
         voxel=True,
-        voxel_type='dynamic',
+        voxel_type="dynamic",
         voxel_layer=dict(
             max_num_points=-1,
             point_cloud_range=point_cloud_range,
             voxel_size=voxel_size,
-            max_voxels=(-1, -1))),
+            max_voxels=(-1, -1),
+        ),
+    ),
     voxel_encoder=dict(
-        type='DynamicSimpleVFE',
+        type="DynamicSimpleVFE",
         point_cloud_range=point_cloud_range,
-        voxel_size=voxel_size),
+        voxel_size=voxel_size,
+    ),
     middle_encoder=dict(
-        type='SparseEncoder',
+        type="SparseEncoder",
         in_channels=5,
         sparse_shape=[41, 1504, 1504],
-        order=('conv', 'norm', 'act'),
-        norm_cfg=dict(type='naiveSyncBN1d', eps=0.001, momentum=0.01),
-        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128,
-                                                                      128)),
+        order=("conv", "norm", "act"),
+        norm_cfg=dict(type="naiveSyncBN1d", eps=0.001, momentum=0.01),
+        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128, 128)),
         encoder_paddings=((1, 1, 1), (1, 1, 1), (1, 1, [0, 1, 1]), (1, 1)),
-        block_type='basicblock'),
+        block_type="basicblock",
+    ),
     backbone=dict(
-        type='DeformableDecoderRPN',
+        type="DeformableDecoderRPN",
         layer_nums=[5, 5, 1],
         ds_num_filters=[256, 256, 128],
         num_input_features=256,
@@ -50,7 +54,7 @@ model = dict(
         corner=True,
         assign_label_window_size=1,
         obj_num=500,
-        norm_cfg=dict(type='SyncBN', eps=1e-3, momentum=0.01),
+        norm_cfg=dict(type="SyncBN", eps=1e-3, momentum=0.01),
         transformer_config=dict(
             depth=2,
             n_heads=6,
@@ -62,22 +66,22 @@ model = dict(
         ),
     ),
     bbox_head=dict(
-        type='CenterFormerBboxHead',
+        type="CenterFormerBboxHead",
         in_channels=256,
         tasks=tasks,
-        dataset='waymo',
+        dataset="waymo",
         weight=2,
         corner_loss=True,
         iou_loss=True,
         assign_label_window_size=1,
-        norm_cfg=dict(type='SyncBN', eps=1e-3, momentum=0.01),
+        norm_cfg=dict(type="SyncBN", eps=1e-3, momentum=0.01),
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={
-            'reg': (2, 2),
-            'height': (1, 2),
-            'dim': (3, 2),
-            'rot': (2, 2),
-            'iou': (1, 2)
+            "reg": (2, 2),
+            "height": (1, 2),
+            "dim": (3, 2),
+            "rot": (2, 2),
+            "iou": (1, 2),
         },  # (output_channel, num_conv)
     ),
     train_cfg=dict(
@@ -89,7 +93,8 @@ model = dict(
         point_cloud_range=point_cloud_range,
         max_objs=500,
         min_radius=2,
-        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    ),
     test_cfg=dict(
         post_center_limit_range=[-80, -80, -10.0, 80, 80, 10.0],
         nms=dict(
@@ -104,34 +109,39 @@ model = dict(
         out_size_factor=4,
         voxel_size=[0.1, 0.1],
         obj_num=1000,
-    ))
+    ),
+)
 
-data_root = 'data/waymo/kitti_format/'
+data_root = "data/waymo/kitti_format/"
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'waymo_dbinfos_train.pkl',
+    info_path=data_root + "waymo_dbinfos_train.pkl",
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
-        filter_by_min_points=dict(Car=5, Pedestrian=5, Cyclist=5)),
+        filter_by_min_points=dict(Car=5, Pedestrian=5, Cyclist=5),
+    ),
     classes=class_names,
     sample_groups=dict(Car=15, Pedestrian=10, Cyclist=10),
     points_loader=dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
         load_dim=6,
         use_dim=[0, 1, 2, 3, 4],
-        backend_args=backend_args),
-    backend_args=backend_args)
+        backend_args=backend_args,
+    ),
+    backend_args=backend_args,
+)
 
 train_pipeline = [
     dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
         load_dim=6,
         use_dim=5,
         norm_intensity=True,
-        backend_args=backend_args),
+        backend_args=backend_args,
+    ),
     # Add this if using `MultiFrameDeformableDecoderRPN`
     # dict(
     #     type='LoadPointsFromMultiSweeps',
@@ -140,98 +150,106 @@ train_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4],
     #     pad_empty_sweeps=True,
     #     remove_close=True),
-    dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(type='ObjectSample', db_sampler=db_sampler),
+    dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
+    dict(type="ObjectSample", db_sampler=db_sampler),
     dict(
-        type='GlobalRotScaleTrans',
+        type="GlobalRotScaleTrans",
         rot_range=[-0.78539816, 0.78539816],
         scale_ratio_range=[0.95, 1.05],
-        translation_std=[0.5, 0.5, 0]),
-    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectNameFilter', classes=class_names),
-    dict(type='PointShuffle'),
-    dict(
-        type='Pack3DDetInputs',
-        keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
+        translation_std=[0.5, 0.5, 0],
+    ),
+    dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="ObjectNameFilter", classes=class_names),
+    dict(type="PointShuffle"),
+    dict(type="Pack3DDetInputs", keys=["points", "gt_bboxes_3d", "gt_labels_3d"]),
 ]
 
 test_pipeline = [
     dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
         load_dim=6,
         use_dim=5,
         norm_intensity=True,
-        backend_args=backend_args),
+        backend_args=backend_args,
+    ),
     dict(
-        type='MultiScaleFlipAug3D',
+        type="MultiScaleFlipAug3D",
         img_scale=(1333, 800),
         pts_scale_ratio=1,
         flip=False,
         transforms=[
             dict(
-                type='GlobalRotScaleTrans',
+                type="GlobalRotScaleTrans",
                 rot_range=[0, 0],
-                scale_ratio_range=[1., 1.],
-                translation_std=[0, 0, 0]),
-            dict(type='RandomFlip3D'),
-            dict(
-                type='PointsRangeFilter', point_cloud_range=point_cloud_range)
-        ]),
+                scale_ratio_range=[1.0, 1.0],
+                translation_std=[0, 0, 0],
+            ),
+            dict(type="RandomFlip3D"),
+            dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
+        ],
+    ),
     dict(
-        type='Pack3DDetInputs',
-        keys=['points'],
-        meta_keys=['box_type_3d', 'sample_idx', 'context_name', 'timestamp'])
+        type="Pack3DDetInputs",
+        keys=["points"],
+        meta_keys=["box_type_3d", "sample_idx", "context_name", "timestamp"],
+    ),
 ]
 
-dataset_type = 'WaymoDataset'
+dataset_type = "WaymoDataset"
 train_dataloader = dict(
     batch_size=4,
     num_workers=4,
     persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=True),
+    sampler=dict(type="DefaultSampler", shuffle=True),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='waymo_infos_train.pkl',
-        data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
+        ann_file="waymo_infos_train.pkl",
+        data_prefix=dict(pts="training/velodyne", sweeps="training/velodyne"),
         pipeline=train_pipeline,
         modality=input_modality,
         test_mode=False,
         metainfo=metainfo,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR',
+        box_type_3d="LiDAR",
         # load one frame every five frames
         load_interval=5,
-        backend_args=backend_args))
+        backend_args=backend_args,
+    ),
+)
 val_dataloader = dict(
     batch_size=1,
     num_workers=1,
     persistent_workers=True,
     drop_last=False,
-    sampler=dict(type='DefaultSampler', shuffle=False),
+    sampler=dict(type="DefaultSampler", shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
-        ann_file='waymo_infos_val.pkl',
+        data_prefix=dict(pts="training/velodyne", sweeps="training/velodyne"),
+        ann_file="waymo_infos_val.pkl",
         pipeline=test_pipeline,
         modality=input_modality,
         test_mode=True,
         metainfo=metainfo,
-        box_type_3d='LiDAR',
-        backend_args=backend_args))
+        box_type_3d="LiDAR",
+        backend_args=backend_args,
+    ),
+)
 test_dataloader = val_dataloader
 
 val_evaluator = dict(
-    type='WaymoMetric', waymo_bin_file='./data/waymo/waymo_format/gt.bin')
+    type="WaymoMetric", waymo_bin_file="./data/waymo/waymo_format/gt.bin"
+)
 test_evaluator = val_evaluator
 
-vis_backends = [dict(type='LocalVisBackend')]
+vis_backends = [dict(type="LocalVisBackend")]
 visualizer = dict(
-    type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')
+    type="Det3DLocalVisualizer", vis_backends=vis_backends, name="visualizer"
+)
 
 # For waymo dataset, we usually evaluate the model at the end of training.
 # Since the models are trained by 24 epochs by default, we set evaluation
@@ -242,9 +260,10 @@ lr = 3e-4
 # This schedule is mainly used by models on nuScenes dataset
 # max_norm=10 is better for SECOND
 optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01, betas=(0.9, 0.99)),
-    clip_grad=dict(max_norm=35, norm_type=2))
+    type="OptimWrapper",
+    optimizer=dict(type="AdamW", lr=lr, weight_decay=0.01, betas=(0.9, 0.99)),
+    clip_grad=dict(max_norm=35, norm_type=2),
+)
 # learning rate
 param_scheduler = [
     # learning rate scheduler
@@ -252,40 +271,44 @@ param_scheduler = [
     # during the next 12 epochs, learning rate decreases from lr * 10 to
     # lr * 1e-4
     dict(
-        type='CosineAnnealingLR',
+        type="CosineAnnealingLR",
         T_max=8,
         eta_min=lr * 10,
         begin=0,
         end=8,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
-        type='CosineAnnealingLR',
+        type="CosineAnnealingLR",
         T_max=12,
         eta_min=lr * 1e-4,
         begin=8,
         end=20,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     # momentum scheduler
     # During the first 8 epochs, momentum increases from 0 to 0.85 / 0.95
     # during the next 12 epochs, momentum increases from 0.85 / 0.95 to 1
     dict(
-        type='CosineAnnealingMomentum',
+        type="CosineAnnealingMomentum",
         T_max=8,
         eta_min=0.85 / 0.95,
         begin=0,
         end=8,
         by_epoch=True,
-        convert_to_iter_based=True),
+        convert_to_iter_based=True,
+    ),
     dict(
-        type='CosineAnnealingMomentum',
+        type="CosineAnnealingMomentum",
         T_max=12,
         eta_min=1,
         begin=8,
         end=20,
         by_epoch=True,
-        convert_to_iter_based=True)
+        convert_to_iter_based=True,
+    ),
 ]
 
 # runtime settings
@@ -300,6 +323,7 @@ test_cfg = dict()
 auto_scale_lr = dict(enable=False, base_batch_size=16)
 
 default_hooks = dict(
-    logger=dict(type='LoggerHook', interval=50),
-    checkpoint=dict(type='CheckpointHook', interval=5))
-custom_hooks = [dict(type='DisableObjectSampleHook', disable_after_epoch=15)]
+    logger=dict(type="LoggerHook", interval=50),
+    checkpoint=dict(type="CheckpointHook", interval=5),
+)
+custom_hooks = [dict(type="DisableObjectSampleHook", disable_after_epoch=15)]

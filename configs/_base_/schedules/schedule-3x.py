@@ -3,25 +3,26 @@
 # e.g., VoteNet on SUNRGBD and ScanNet
 lr = 0.008  # max learning rate
 optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
+    type="OptimWrapper",
+    optimizer=dict(type="AdamW", lr=lr, weight_decay=0.01),
     clip_grad=dict(max_norm=10, norm_type=2),
 )
 
 # training schedule for 3x
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=36, val_interval=1)
-val_cfg = dict(type='ValLoop')
-test_cfg = dict(type='TestLoop')
+train_cfg = dict(type="EpochBasedTrainLoop", max_epochs=36, val_interval=1)
+val_cfg = dict(type="ValLoop")
+test_cfg = dict(type="TestLoop")
 
 # learning rate
 param_scheduler = [
     dict(
-        type='MultiStepLR',
+        type="MultiStepLR",
         begin=0,
         end=36,
         by_epoch=True,
         milestones=[24, 32],
-        gamma=0.1)
+        gamma=0.1,
+    )
 ]
 
 # Default setting for scaling LR automatically

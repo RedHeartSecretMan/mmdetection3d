@@ -4,9 +4,9 @@ from os import path as osp
 from typing import Callable, List, Optional, Union
 
 import numpy as np
-
 from mmdet3d.registry import DATASETS
 from mmdet3d.structures import DepthInstance3DBoxes
+
 from .det3d_dataset import Det3DDataset
 from .seg3d_dataset import Seg3DDataset
 
@@ -48,45 +48,95 @@ class ScanNetDataset(Det3DDataset):
         test_mode (bool): Whether the dataset is in test mode.
             Defaults to False.
     """
+
     METAINFO = {
-        'classes':
-        ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-         'bookshelf', 'picture', 'counter', 'desk', 'curtain', 'refrigerator',
-         'showercurtrain', 'toilet', 'sink', 'bathtub', 'garbagebin'),
+        "classes": (
+            "cabinet",
+            "bed",
+            "chair",
+            "sofa",
+            "table",
+            "door",
+            "window",
+            "bookshelf",
+            "picture",
+            "counter",
+            "desk",
+            "curtain",
+            "refrigerator",
+            "showercurtrain",
+            "toilet",
+            "sink",
+            "bathtub",
+            "garbagebin",
+        ),
         # the valid ids of segmentation annotations
-        'seg_valid_class_ids':
-        (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39),
-        'seg_all_class_ids':
-        tuple(range(1, 41)),
-        'palette': [(31, 119, 180), (255, 187, 120), (188, 189, 34),
-                    (140, 86, 75), (255, 152, 150), (214, 39, 40),
-                    (197, 176, 213), (148, 103, 189), (196, 156, 148),
-                    (23, 190, 207), (247, 182, 210), (219, 219, 141),
-                    (255, 127, 14), (158, 218, 229), (44, 160, 44),
-                    (112, 128, 144), (227, 119, 194), (82, 84, 163)]
+        "seg_valid_class_ids": (
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            14,
+            16,
+            24,
+            28,
+            33,
+            34,
+            36,
+            39,
+        ),
+        "seg_all_class_ids": tuple(range(1, 41)),
+        "palette": [
+            (31, 119, 180),
+            (255, 187, 120),
+            (188, 189, 34),
+            (140, 86, 75),
+            (255, 152, 150),
+            (214, 39, 40),
+            (197, 176, 213),
+            (148, 103, 189),
+            (196, 156, 148),
+            (23, 190, 207),
+            (247, 182, 210),
+            (219, 219, 141),
+            (255, 127, 14),
+            (158, 218, 229),
+            (44, 160, 44),
+            (112, 128, 144),
+            (227, 119, 194),
+            (82, 84, 163),
+        ],
     }
 
-    def __init__(self,
-                 data_root: str,
-                 ann_file: str,
-                 metainfo: Optional[dict] = None,
-                 data_prefix: dict = dict(
-                     pts='points',
-                     pts_instance_mask='instance_mask',
-                     pts_semantic_mask='semantic_mask'),
-                 pipeline: List[Union[dict, Callable]] = [],
-                 modality: dict = dict(use_camera=False, use_lidar=True),
-                 box_type_3d: str = 'Depth',
-                 filter_empty_gt: bool = True,
-                 test_mode: bool = False,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        data_root: str,
+        ann_file: str,
+        metainfo: Optional[dict] = None,
+        data_prefix: dict = dict(
+            pts="points",
+            pts_instance_mask="instance_mask",
+            pts_semantic_mask="semantic_mask",
+        ),
+        pipeline: List[Union[dict, Callable]] = [],
+        modality: dict = dict(use_camera=False, use_lidar=True),
+        box_type_3d: str = "Depth",
+        filter_empty_gt: bool = True,
+        test_mode: bool = False,
+        **kwargs
+    ) -> None:
 
         # construct seg_label_mapping for semantic mask
-        seg_max_cat_id = len(self.METAINFO['seg_all_class_ids'])
-        seg_valid_cat_ids = self.METAINFO['seg_valid_class_ids']
+        seg_max_cat_id = len(self.METAINFO["seg_all_class_ids"])
+        seg_valid_cat_ids = self.METAINFO["seg_valid_class_ids"]
         neg_label = len(seg_valid_cat_ids)
-        seg_label_mapping = np.ones(
-            seg_max_cat_id + 1, dtype=np.int64) * neg_label
+        seg_label_mapping = np.ones(seg_max_cat_id + 1, dtype=np.int64) * neg_label
         for cls_idx, cat_id in enumerate(seg_valid_cat_ids):
             seg_label_mapping[cat_id] = cls_idx
         self.seg_label_mapping = seg_label_mapping
@@ -101,12 +151,12 @@ class ScanNetDataset(Det3DDataset):
             box_type_3d=box_type_3d,
             filter_empty_gt=filter_empty_gt,
             test_mode=test_mode,
-            **kwargs)
+            **kwargs
+        )
 
-        self.metainfo['seg_label_mapping'] = self.seg_label_mapping
-        assert 'use_camera' in self.modality and \
-               'use_lidar' in self.modality
-        assert self.modality['use_camera'] or self.modality['use_lidar']
+        self.metainfo["seg_label_mapping"] = self.seg_label_mapping
+        assert "use_camera" in self.modality and "use_lidar" in self.modality
+        assert self.modality["use_camera"] or self.modality["use_lidar"]
 
     @staticmethod
     def _get_axis_align_matrix(info: dict) -> np.ndarray:
@@ -118,12 +168,13 @@ class ScanNetDataset(Det3DDataset):
         Returns:
             np.ndarray: 4x4 transformation matrix.
         """
-        if 'axis_align_matrix' in info:
-            return np.array(info['axis_align_matrix'])
+        if "axis_align_matrix" in info:
+            return np.array(info["axis_align_matrix"])
         else:
             warnings.warn(
-                'axis_align_matrix is not found in ScanNet data info, please '
-                'use new pre-process scripts to re-generate ScanNet data')
+                "axis_align_matrix is not found in ScanNet data info, please "
+                "use new pre-process scripts to re-generate ScanNet data"
+            )
             return np.eye(4).astype(np.float32)
 
     def parse_data_info(self, info: dict) -> dict:
@@ -139,18 +190,20 @@ class ScanNetDataset(Det3DDataset):
             dict: Has `ann_info` in training stage. And
             all path has been converted to absolute path.
         """
-        info['axis_align_matrix'] = self._get_axis_align_matrix(info)
-        info['pts_instance_mask_path'] = osp.join(
-            self.data_prefix.get('pts_instance_mask', ''),
-            info['pts_instance_mask_path'])
-        info['pts_semantic_mask_path'] = osp.join(
-            self.data_prefix.get('pts_semantic_mask', ''),
-            info['pts_semantic_mask_path'])
+        info["axis_align_matrix"] = self._get_axis_align_matrix(info)
+        info["pts_instance_mask_path"] = osp.join(
+            self.data_prefix.get("pts_instance_mask", ""),
+            info["pts_instance_mask_path"],
+        )
+        info["pts_semantic_mask_path"] = osp.join(
+            self.data_prefix.get("pts_semantic_mask", ""),
+            info["pts_semantic_mask_path"],
+        )
 
         info = super().parse_data_info(info)
         # only be used in `PointSegClassMapping` in pipeline
         # to map original semantic class to valid category ids.
-        info['seg_label_mapping'] = self.seg_label_mapping
+        info["seg_label_mapping"] = self.seg_label_mapping
         return info
 
     def parse_ann_info(self, info: dict) -> dict:
@@ -166,15 +219,16 @@ class ScanNetDataset(Det3DDataset):
         # empty gt
         if ann_info is None:
             ann_info = dict()
-            ann_info['gt_bboxes_3d'] = np.zeros((0, 6), dtype=np.float32)
-            ann_info['gt_labels_3d'] = np.zeros((0, ), dtype=np.int64)
+            ann_info["gt_bboxes_3d"] = np.zeros((0, 6), dtype=np.float32)
+            ann_info["gt_labels_3d"] = np.zeros((0,), dtype=np.int64)
         # to target box structure
 
-        ann_info['gt_bboxes_3d'] = DepthInstance3DBoxes(
-            ann_info['gt_bboxes_3d'],
-            box_dim=ann_info['gt_bboxes_3d'].shape[-1],
+        ann_info["gt_bboxes_3d"] = DepthInstance3DBoxes(
+            ann_info["gt_bboxes_3d"],
+            box_dim=ann_info["gt_bboxes_3d"].shape[-1],
             with_yaw=False,
-            origin=(0.5, 0.5, 0.5)).convert_to(self.box_mode_3d)
+            origin=(0.5, 0.5, 0.5),
+        ).convert_to(self.box_mode_3d)
 
         return ann_info
 
@@ -212,13 +266,31 @@ class ScanNetSegDataset(Seg3DDataset):
         test_mode (bool): Whether the dataset is in test mode.
             Defaults to False.
     """
+
     METAINFO = {
-        'classes':
-        ('wall', 'floor', 'cabinet', 'bed', 'chair', 'sofa', 'table', 'door',
-         'window', 'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-         'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
-         'otherfurniture'),
-        'palette': [
+        "classes": (
+            "wall",
+            "floor",
+            "cabinet",
+            "bed",
+            "chair",
+            "sofa",
+            "table",
+            "door",
+            "window",
+            "bookshelf",
+            "picture",
+            "counter",
+            "desk",
+            "curtain",
+            "refrigerator",
+            "showercurtrain",
+            "toilet",
+            "sink",
+            "bathtub",
+            "otherfurniture",
+        ),
+        "palette": [
             [174, 199, 232],
             [152, 223, 138],
             [31, 119, 180],
@@ -240,27 +312,46 @@ class ScanNetSegDataset(Seg3DDataset):
             [227, 119, 194],
             [82, 84, 163],
         ],
-        'seg_valid_class_ids': (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16,
-                                24, 28, 33, 34, 36, 39),
-        'seg_all_class_ids':
-        tuple(range(41)),
+        "seg_valid_class_ids": (
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            14,
+            16,
+            24,
+            28,
+            33,
+            34,
+            36,
+            39,
+        ),
+        "seg_all_class_ids": tuple(range(41)),
     }
 
-    def __init__(self,
-                 data_root: Optional[str] = None,
-                 ann_file: str = '',
-                 metainfo: Optional[dict] = None,
-                 data_prefix: dict = dict(
-                     pts='points',
-                     img='',
-                     pts_instance_mask='',
-                     pts_semantic_mask=''),
-                 pipeline: List[Union[dict, Callable]] = [],
-                 modality: dict = dict(use_lidar=True, use_camera=False),
-                 ignore_index: Optional[int] = None,
-                 scene_idxs: Optional[Union[np.ndarray, str]] = None,
-                 test_mode: bool = False,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        data_root: Optional[str] = None,
+        ann_file: str = "",
+        metainfo: Optional[dict] = None,
+        data_prefix: dict = dict(
+            pts="points", img="", pts_instance_mask="", pts_semantic_mask=""
+        ),
+        pipeline: List[Union[dict, Callable]] = [],
+        modality: dict = dict(use_lidar=True, use_camera=False),
+        ignore_index: Optional[int] = None,
+        scene_idxs: Optional[Union[np.ndarray, str]] = None,
+        test_mode: bool = False,
+        **kwargs
+    ) -> None:
         super().__init__(
             data_root=data_root,
             ann_file=ann_file,
@@ -271,10 +362,10 @@ class ScanNetSegDataset(Seg3DDataset):
             ignore_index=ignore_index,
             scene_idxs=scene_idxs,
             test_mode=test_mode,
-            **kwargs)
+            **kwargs
+        )
 
-    def get_scene_idxs(self, scene_idxs: Union[np.ndarray, str,
-                                               None]) -> np.ndarray:
+    def get_scene_idxs(self, scene_idxs: Union[np.ndarray, str, None]) -> np.ndarray:
         """Compute scene_idxs for data sampling.
 
         We sample more times for scenes with more points.
@@ -282,7 +373,8 @@ class ScanNetSegDataset(Seg3DDataset):
         # when testing, we load one whole scene every time
         if not self.test_mode and scene_idxs is None:
             raise NotImplementedError(
-                'please provide re-sampled scene indexes for training')
+                "please provide re-sampled scene indexes for training"
+            )
 
         return super().get_scene_idxs(scene_idxs)
 
@@ -291,11 +383,27 @@ class ScanNetSegDataset(Seg3DDataset):
 class ScanNetInstanceSegDataset(Seg3DDataset):
 
     METAINFO = {
-        'classes':
-        ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-         'bookshelf', 'picture', 'counter', 'desk', 'curtain', 'refrigerator',
-         'showercurtrain', 'toilet', 'sink', 'bathtub', 'garbagebin'),
-        'palette': [
+        "classes": (
+            "cabinet",
+            "bed",
+            "chair",
+            "sofa",
+            "table",
+            "door",
+            "window",
+            "bookshelf",
+            "picture",
+            "counter",
+            "desk",
+            "curtain",
+            "refrigerator",
+            "showercurtrain",
+            "toilet",
+            "sink",
+            "bathtub",
+            "garbagebin",
+        ),
+        "palette": [
             [174, 199, 232],
             [152, 223, 138],
             [31, 119, 180],
@@ -317,28 +425,45 @@ class ScanNetInstanceSegDataset(Seg3DDataset):
             [227, 119, 194],
             [82, 84, 163],
         ],
-        'seg_valid_class_ids':
-        (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39),
-        'seg_all_class_ids':
-        tuple(range(41))
+        "seg_valid_class_ids": (
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            14,
+            16,
+            24,
+            28,
+            33,
+            34,
+            36,
+            39,
+        ),
+        "seg_all_class_ids": tuple(range(41)),
     }
 
-    def __init__(self,
-                 data_root: Optional[str] = None,
-                 ann_file: str = '',
-                 metainfo: Optional[dict] = None,
-                 data_prefix: dict = dict(
-                     pts='points',
-                     img='',
-                     pts_instance_mask='',
-                     pts_semantic_mask=''),
-                 pipeline: List[Union[dict, Callable]] = [],
-                 modality: dict = dict(use_lidar=True, use_camera=False),
-                 test_mode: bool = False,
-                 ignore_index: Optional[int] = None,
-                 scene_idxs: Optional[Union[np.ndarray, str]] = None,
-                 backend_args: Optional[dict] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        data_root: Optional[str] = None,
+        ann_file: str = "",
+        metainfo: Optional[dict] = None,
+        data_prefix: dict = dict(
+            pts="points", img="", pts_instance_mask="", pts_semantic_mask=""
+        ),
+        pipeline: List[Union[dict, Callable]] = [],
+        modality: dict = dict(use_lidar=True, use_camera=False),
+        test_mode: bool = False,
+        ignore_index: Optional[int] = None,
+        scene_idxs: Optional[Union[np.ndarray, str]] = None,
+        backend_args: Optional[dict] = None,
+        **kwargs
+    ) -> None:
         super().__init__(
             data_root=data_root,
             ann_file=ann_file,
@@ -350,4 +475,5 @@ class ScanNetInstanceSegDataset(Seg3DDataset):
             ignore_index=ignore_index,
             scene_idxs=scene_idxs,
             backend_args=backend_args,
-            **kwargs)
+            **kwargs
+        )

@@ -1,18 +1,16 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
+from mmdet3d.registry import MODELS
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from mmdet3d.registry import MODELS
 
-
-def one_hot(label: Tensor,
-            n_classes: int,
-            requires_grad: bool = True) -> Tensor:
+def one_hot(label: Tensor, n_classes: int, requires_grad: bool = True) -> Tensor:
     """Return One Hot Label."""
     device = label.device
-    one_hot_label = torch.eye(
-        n_classes, device=device, requires_grad=requires_grad)[label]
+    one_hot_label = torch.eye(n_classes, device=device, requires_grad=requires_grad)[
+        label
+    ]
     one_hot_label = one_hot_label.transpose(1, 3).transpose(2, 3)
 
     return one_hot_label
@@ -49,14 +47,13 @@ class BoundaryLoss(nn.Module):
             1 - one_hot_gt,
             kernel_size=self.theta0,
             stride=1,
-            padding=(self.theta0 - 1) // 2)
+            padding=(self.theta0 - 1) // 2,
+        )
         gt_b -= 1 - one_hot_gt
 
         pred_b = F.max_pool2d(
-            1 - pred,
-            kernel_size=self.theta0,
-            stride=1,
-            padding=(self.theta0 - 1) // 2)
+            1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2
+        )
         pred_b -= 1 - pred
 
         gt_b = gt_b.view(n, c, -1)

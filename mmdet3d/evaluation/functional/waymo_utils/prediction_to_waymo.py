@@ -11,7 +11,8 @@ except ImportError:
     Objects = None
     raise ImportError(
         'Please run "pip install waymo-open-dataset-tf-2-1-0==1.2.0" '
-        'to install the official devkit first.')
+        "to install the official devkit first."
+    )
 
 from typing import List
 
@@ -35,21 +36,23 @@ class Prediction2Waymo(object):
         num_workers (str): Number of parallel processes. Defaults to 4.
     """
 
-    def __init__(self,
-                 results: List[dict],
-                 waymo_results_final_path: str,
-                 classes: dict,
-                 num_workers: int = 4):
+    def __init__(
+        self,
+        results: List[dict],
+        waymo_results_final_path: str,
+        classes: dict,
+        num_workers: int = 4,
+    ):
         self.results = results
         self.waymo_results_final_path = waymo_results_final_path
         self.classes = classes
         self.num_workers = num_workers
 
         self.k2w_cls_map = {
-            'Car': label_pb2.Label.TYPE_VEHICLE,
-            'Pedestrian': label_pb2.Label.TYPE_PEDESTRIAN,
-            'Sign': label_pb2.Label.TYPE_SIGN,
-            'Cyclist': label_pb2.Label.TYPE_CYCLIST,
+            "Car": label_pb2.Label.TYPE_VEHICLE,
+            "Pedestrian": label_pb2.Label.TYPE_PEDESTRIAN,
+            "Sign": label_pb2.Label.TYPE_SIGN,
+            "Cyclist": label_pb2.Label.TYPE_CYCLIST,
         }
 
     def convert_one(self, res_idx: int):
@@ -59,19 +62,22 @@ class Prediction2Waymo(object):
         Args:
             res_idx (int): The indices of the results.
         """
-        sample_idx = self.results[res_idx]['sample_idx']
-        if len(self.results[res_idx]['labels_3d']) > 0:
+        sample_idx = self.results[res_idx]["sample_idx"]
+        if len(self.results[res_idx]["labels_3d"]) > 0:
             objects = self.parse_objects_from_origin(
-                self.results[res_idx], self.results[res_idx]['context_name'],
-                self.results[res_idx]['timestamp'])
+                self.results[res_idx],
+                self.results[res_idx]["context_name"],
+                self.results[res_idx]["timestamp"],
+            )
         else:
-            print(sample_idx, 'not found.')
+            print(sample_idx, "not found.")
             objects = metrics_pb2.Objects()
 
         return objects
 
-    def parse_objects_from_origin(self, result: dict, contextname: str,
-                                  timestamp: str) -> Objects:
+    def parse_objects_from_origin(
+        self, result: dict, contextname: str, timestamp: str
+    ) -> Objects:
         """Parse obejcts from the original prediction results.
 
         Args:
@@ -82,9 +88,9 @@ class Prediction2Waymo(object):
         Returns:
             metrics_pb2.Objects: The parsed object.
         """
-        lidar_boxes = result['bboxes_3d']
-        scores = result['scores_3d']
-        labels = result['labels_3d']
+        lidar_boxes = result["bboxes_3d"]
+        scores = result["scores_3d"]
+        labels = result["labels_3d"]
 
         objects = metrics_pb2.Objects()
         for lidar_box, score, label in zip(lidar_boxes, scores, labels):
@@ -115,21 +121,20 @@ class Prediction2Waymo(object):
 
     def convert(self):
         """Convert action."""
-        print_log('Start converting ...', logger='current')
+        print_log("Start converting ...", logger="current")
 
         # TODO: use parallel processes.
         # objects_list = mmengine.track_parallel_progress(
         #     self.convert_one, range(len(self)), self.num_workers)
 
-        objects_list = mmengine.track_progress(self.convert_one,
-                                               range(len(self)))
+        objects_list = mmengine.track_progress(self.convert_one, range(len(self)))
 
         combined = metrics_pb2.Objects()
         for objects in objects_list:
             for o in objects.objects:
                 combined.objects.append(o)
 
-        with open(self.waymo_results_final_path, 'wb') as f:
+        with open(self.waymo_results_final_path, "wb") as f:
             f.write(combined.SerializeToString())
 
     def __len__(self):

@@ -6,6 +6,10 @@ from .tr3d_neck import TR3DNeck
 from .transforms_3d import TR3DPointSample
 
 __all__ = [
-    'TR3DAxisAlignedIoULoss', 'TR3DMinkResNet', 'TR3DRotatedIoU3DLoss',
-    'TR3DHead', 'TR3DNeck', 'TR3DPointSample'
+    "TR3DAxisAlignedIoULoss",
+    "TR3DMinkResNet",
+    "TR3DRotatedIoU3DLoss",
+    "TR3DHead",
+    "TR3DNeck",
+    "TR3DPointSample",
 ]

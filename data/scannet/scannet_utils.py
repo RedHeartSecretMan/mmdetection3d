@@ -30,13 +30,11 @@ def represents_int(s):
         return False
 
 
-def read_label_mapping(filename,
-                       label_from='raw_category',
-                       label_to='nyu40id'):
+def read_label_mapping(filename, label_from="raw_category", label_to="nyu40id"):
     assert os.path.isfile(filename)
     mapping = dict()
     with open(filename) as csvfile:
-        reader = csv.DictReader(csvfile, delimiter='\t')
+        reader = csv.DictReader(csvfile, delimiter="\t")
         for row in reader:
             mapping[row[label_from]] = int(row[label_to])
     if represents_int(list(mapping.keys())[0]):
@@ -54,13 +52,13 @@ def read_mesh_vertices(filename):
         ndarray: Vertices.
     """
     assert os.path.isfile(filename)
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         plydata = PlyData.read(f)
-        num_verts = plydata['vertex'].count
+        num_verts = plydata["vertex"].count
         vertices = np.zeros(shape=[num_verts, 3], dtype=np.float32)
-        vertices[:, 0] = plydata['vertex'].data['x']
-        vertices[:, 1] = plydata['vertex'].data['y']
-        vertices[:, 2] = plydata['vertex'].data['z']
+        vertices[:, 0] = plydata["vertex"].data["x"]
+        vertices[:, 1] = plydata["vertex"].data["y"]
+        vertices[:, 2] = plydata["vertex"].data["z"]
     return vertices
 
 
@@ -74,14 +72,14 @@ def read_mesh_vertices_rgb(filename):
         Vertices. Note that RGB values are in 0-255.
     """
     assert os.path.isfile(filename)
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         plydata = PlyData.read(f)
-        num_verts = plydata['vertex'].count
+        num_verts = plydata["vertex"].count
         vertices = np.zeros(shape=[num_verts, 6], dtype=np.float32)
-        vertices[:, 0] = plydata['vertex'].data['x']
-        vertices[:, 1] = plydata['vertex'].data['y']
-        vertices[:, 2] = plydata['vertex'].data['z']
-        vertices[:, 3] = plydata['vertex'].data['red']
-        vertices[:, 4] = plydata['vertex'].data['green']
-        vertices[:, 5] = plydata['vertex'].data['blue']
+        vertices[:, 0] = plydata["vertex"].data["x"]
+        vertices[:, 1] = plydata["vertex"].data["y"]
+        vertices[:, 2] = plydata["vertex"].data["z"]
+        vertices[:, 3] = plydata["vertex"].data["red"]
+        vertices[:, 4] = plydata["vertex"].data["green"]
+        vertices[:, 5] = plydata["vertex"].data["blue"]
     return vertices

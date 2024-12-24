@@ -1,14 +1,14 @@
 # modified from https://github.com/Haiyang-W/DSVT
 import torch
 import torch.nn as nn
-
 from mmdet3d.registry import MODELS
+
 from .dsvt_input_layer import DSVTInputLayer
 
 
 @MODELS.register_module()
 class DSVTMiddleEncoder(nn.Module):
-    '''Dynamic Sparse Voxel Transformer Backbone.
+    """Dynamic Sparse Voxel Transformer Backbone.
     Args:
         INPUT_LAYER: Config of input layer, which converts the output of vfe
             to dsvt input.
@@ -32,30 +32,32 @@ class DSVTMiddleEncoder(nn.Module):
         output_shape (tuple[int, int]): Shape of output bev feature.
         conv_out_channel (int): Number of output channels.
 
-    '''
+    """
 
     def __init__(
-            self,
-            input_layer=dict(
-                sparse_shape=[468, 468, 1],
-                downsample_stride=[],
-                dim_model=[192],
-                set_info=[[36, 4]],
-                window_shape=[[12, 12, 1]],
-                hybrid_factor=[2, 2, 1],  # x, y, z
-                shifts_list=[[[0, 0, 0], [6, 6, 0]]],
-                normalize_pos=False),
-            stage_num=1,
-            output_shape=[468, 468],
-            reduction_type='attention',
+        self,
+        input_layer=dict(
+            sparse_shape=[468, 468, 1],
             downsample_stride=[],
-            set_info=[[36, 4]],
             dim_model=[192],
-            dim_feedforward=[384],
-            nhead=[8],
-            conv_out_channel=192,
-            dropout=0.,
-            activation='gelu'):
+            set_info=[[36, 4]],
+            window_shape=[[12, 12, 1]],
+            hybrid_factor=[2, 2, 1],  # x, y, z
+            shifts_list=[[[0, 0, 0], [6, 6, 0]]],
+            normalize_pos=False,
+        ),
+        stage_num=1,
+        output_shape=[468, 468],
+        reduction_type="attention",
+        downsample_stride=[],
+        set_info=[[36, 4]],
+        dim_model=[192],
+        dim_feedforward=[384],
+        nhead=[8],
+        conv_out_channel=192,
+        dropout=0.0,
+        activation="gelu",
+    ):
         super().__init__()
         self.input_layer = DSVTInputLayer(**input_layer)
         self.reduction_type = reduction_type
@@ -76,30 +78,38 @@ class DSVTMiddleEncoder(nn.Module):
                         dfeed_this_stage,
                         dropout,
                         activation,
-                        batch_first=True))
+                        batch_first=True,
+                    )
+                )
                 norm_list.append(nn.LayerNorm(dmodel_this_stage))
-            self.__setattr__(f'stage_{stage_id}', nn.ModuleList(block_list))
-            self.__setattr__(f'residual_norm_stage_{stage_id}',
-                             nn.ModuleList(norm_list))
+            self.__setattr__(f"stage_{stage_id}", nn.ModuleList(block_list))
+            self.__setattr__(
+                f"residual_norm_stage_{stage_id}", nn.ModuleList(norm_list)
+            )
 
             # apply pooling except the last stage
             if stage_id < stage_num - 1:
                 downsample_window = downsample_stride[stage_id]
                 dmodel_next_stage = dim_model[stage_id + 1]
                 pool_volume = torch.IntTensor(downsample_window).prod().item()
-                if self.reduction_type == 'linear':
-                    cat_feat_dim = dmodel_this_stage * torch.IntTensor(
-                        downsample_window).prod().item()
+                if self.reduction_type == "linear":
+                    cat_feat_dim = (
+                        dmodel_this_stage
+                        * torch.IntTensor(downsample_window).prod().item()
+                    )
                     self.__setattr__(
-                        f'stage_{stage_id}_reduction',
-                        StageReductionBlock(cat_feat_dim, dmodel_next_stage))
-                elif self.reduction_type == 'maxpool':
-                    self.__setattr__(f'stage_{stage_id}_reduction',
-                                     torch.nn.MaxPool1d(pool_volume))
-                elif self.reduction_type == 'attention':
+                        f"stage_{stage_id}_reduction",
+                        StageReductionBlock(cat_feat_dim, dmodel_next_stage),
+                    )
+                elif self.reduction_type == "maxpool":
                     self.__setattr__(
-                        f'stage_{stage_id}_reduction',
-                        StageReductionAttBlock(dmodel_this_stage, pool_volume))
+                        f"stage_{stage_id}_reduction", torch.nn.MaxPool1d(pool_volume)
+                    )
+                elif self.reduction_type == "attention":
+                    self.__setattr__(
+                        f"stage_{stage_id}_reduction",
+                        StageReductionAttBlock(dmodel_this_stage, pool_volume),
+                    )
                 else:
                     raise NotImplementedError
 
@@ -112,7 +122,7 @@ class DSVTMiddleEncoder(nn.Module):
         self._reset_parameters()
 
     def forward(self, batch_dict):
-        '''
+        """
         Args:
             bacth_dict (dict):
                 The dict contains the following keys
@@ -130,41 +140,52 @@ class DSVTMiddleEncoder(nn.Module):
                 - pillar_features (Tensor[float]):
                 - voxel_coords (Tensor[int]):
                 - ...
-        '''
+        """
         voxel_info = self.input_layer(batch_dict)
 
-        voxel_feat = voxel_info['voxel_feats_stage0']
-        set_voxel_inds_list = [[
-            voxel_info[f'set_voxel_inds_stage{s}_shift{i}']
-            for i in range(self.num_shifts[s])
-        ] for s in range(self.stage_num)]
-        set_voxel_masks_list = [[
-            voxel_info[f'set_voxel_mask_stage{s}_shift{i}']
-            for i in range(self.num_shifts[s])
-        ] for s in range(self.stage_num)]
-        pos_embed_list = [[[
-            voxel_info[f'pos_embed_stage{s}_block{b}_shift{i}']
-            for i in range(self.num_shifts[s])
-        ] for b in range(self.set_info[s][1])] for s in range(self.stage_num)]
+        voxel_feat = voxel_info["voxel_feats_stage0"]
+        set_voxel_inds_list = [
+            [
+                voxel_info[f"set_voxel_inds_stage{s}_shift{i}"]
+                for i in range(self.num_shifts[s])
+            ]
+            for s in range(self.stage_num)
+        ]
+        set_voxel_masks_list = [
+            [
+                voxel_info[f"set_voxel_mask_stage{s}_shift{i}"]
+                for i in range(self.num_shifts[s])
+            ]
+            for s in range(self.stage_num)
+        ]
+        pos_embed_list = [
+            [
+                [
+                    voxel_info[f"pos_embed_stage{s}_block{b}_shift{i}"]
+                    for i in range(self.num_shifts[s])
+                ]
+                for b in range(self.set_info[s][1])
+            ]
+            for s in range(self.stage_num)
+        ]
         pooling_mapping_index = [
-            voxel_info[f'pooling_mapping_index_stage{s+1}']
+            voxel_info[f"pooling_mapping_index_stage{s+1}"]
             for s in range(self.stage_num - 1)
         ]
         pooling_index_in_pool = [
-            voxel_info[f'pooling_index_in_pool_stage{s+1}']
+            voxel_info[f"pooling_index_in_pool_stage{s+1}"]
             for s in range(self.stage_num - 1)
         ]
         pooling_preholder_feats = [
-            voxel_info[f'pooling_preholder_feats_stage{s+1}']
+            voxel_info[f"pooling_preholder_feats_stage{s+1}"]
             for s in range(self.stage_num - 1)
         ]
 
         output = voxel_feat
         block_id = 0
         for stage_id in range(self.stage_num):
-            block_layers = self.__getattr__(f'stage_{stage_id}')
-            residual_norm_layers = self.__getattr__(
-                f'residual_norm_stage_{stage_id}')
+            block_layers = self.__getattr__(f"stage_{stage_id}")
+            residual_norm_layers = self.__getattr__(f"residual_norm_stage_{stage_id}")
             for i in range(len(block_layers)):
                 block = block_layers[i]
                 residual = output.clone()
@@ -173,66 +194,78 @@ class DSVTMiddleEncoder(nn.Module):
                     set_voxel_inds_list[stage_id],
                     set_voxel_masks_list[stage_id],
                     pos_embed_list[stage_id][i],
-                    block_id=block_id)
+                    block_id=block_id,
+                )
                 output = residual_norm_layers[i](output + residual)
                 block_id += 1
             if stage_id < self.stage_num - 1:
                 # pooling
-                prepool_features = pooling_preholder_feats[stage_id].type_as(
-                    output)
+                prepool_features = pooling_preholder_feats[stage_id].type_as(output)
                 pooled_voxel_num = prepool_features.shape[0]
                 pool_volume = prepool_features.shape[1]
-                prepool_features[pooling_mapping_index[stage_id],
-                                 pooling_index_in_pool[stage_id]] = output
-                prepool_features = prepool_features.view(
-                    prepool_features.shape[0], -1)
+                prepool_features[
+                    pooling_mapping_index[stage_id], pooling_index_in_pool[stage_id]
+                ] = output
+                prepool_features = prepool_features.view(prepool_features.shape[0], -1)
 
-                if self.reduction_type == 'linear':
-                    output = self.__getattr__(f'stage_{stage_id}_reduction')(
-                        prepool_features)
-                elif self.reduction_type == 'maxpool':
+                if self.reduction_type == "linear":
+                    output = self.__getattr__(f"stage_{stage_id}_reduction")(
+                        prepool_features
+                    )
+                elif self.reduction_type == "maxpool":
                     prepool_features = prepool_features.view(
-                        pooled_voxel_num, pool_volume, -1).permute(0, 2, 1)
-                    output = self.__getattr__(f'stage_{stage_id}_reduction')(
-                        prepool_features).squeeze(-1)
-                elif self.reduction_type == 'attention':
+                        pooled_voxel_num, pool_volume, -1
+                    ).permute(0, 2, 1)
+                    output = self.__getattr__(f"stage_{stage_id}_reduction")(
+                        prepool_features
+                    ).squeeze(-1)
+                elif self.reduction_type == "attention":
                     prepool_features = prepool_features.view(
-                        pooled_voxel_num, pool_volume, -1).permute(0, 2, 1)
-                    key_padding_mask = torch.zeros(
-                        (pooled_voxel_num,
-                         pool_volume)).to(prepool_features.device).int()
-                    output = self.__getattr__(f'stage_{stage_id}_reduction')(
-                        prepool_features, key_padding_mask)
+                        pooled_voxel_num, pool_volume, -1
+                    ).permute(0, 2, 1)
+                    key_padding_mask = (
+                        torch.zeros((pooled_voxel_num, pool_volume))
+                        .to(prepool_features.device)
+                        .int()
+                    )
+                    output = self.__getattr__(f"stage_{stage_id}_reduction")(
+                        prepool_features, key_padding_mask
+                    )
                 else:
                     raise NotImplementedError
 
-        batch_dict['pillar_features'] = batch_dict['voxel_features'] = output
-        batch_dict['voxel_coords'] = voxel_info[
-            f'voxel_coors_stage{self.stage_num - 1}']
+        batch_dict["pillar_features"] = batch_dict["voxel_features"] = output
+        batch_dict["voxel_coords"] = voxel_info[
+            f"voxel_coors_stage{self.stage_num - 1}"
+        ]
         return batch_dict
 
     def _reset_parameters(self):
         for name, p in self.named_parameters():
-            if p.dim() > 1 and 'scaler' not in name:
+            if p.dim() > 1 and "scaler" not in name:
                 nn.init.xavier_uniform_(p)
 
 
 class DSVTBlock(nn.Module):
     """Consist of two encoder layer, shift and shift back."""
 
-    def __init__(self,
-                 dim_model,
-                 nhead,
-                 dim_feedforward=2048,
-                 dropout=0.1,
-                 activation='relu',
-                 batch_first=True):
+    def __init__(
+        self,
+        dim_model,
+        nhead,
+        dim_feedforward=2048,
+        dropout=0.1,
+        activation="relu",
+        batch_first=True,
+    ):
         super().__init__()
 
-        encoder_1 = DSVTEncoderLayer(dim_model, nhead, dim_feedforward,
-                                     dropout, activation, batch_first)
-        encoder_2 = DSVTEncoderLayer(dim_model, nhead, dim_feedforward,
-                                     dropout, activation, batch_first)
+        encoder_1 = DSVTEncoderLayer(
+            dim_model, nhead, dim_feedforward, dropout, activation, batch_first
+        )
+        encoder_2 = DSVTEncoderLayer(
+            dim_model, nhead, dim_feedforward, dropout, activation, batch_first
+        )
         self.encoder_list = nn.ModuleList([encoder_1, encoder_2])
 
     def forward(
@@ -260,18 +293,26 @@ class DSVTBlock(nn.Module):
 
 class DSVTEncoderLayer(nn.Module):
 
-    def __init__(self,
-                 dim_model,
-                 nhead,
-                 dim_feedforward=2048,
-                 dropout=0.1,
-                 activation='relu',
-                 batch_first=True,
-                 mlp_dropout=0):
+    def __init__(
+        self,
+        dim_model,
+        nhead,
+        dim_feedforward=2048,
+        dropout=0.1,
+        activation="relu",
+        batch_first=True,
+        mlp_dropout=0,
+    ):
         super().__init__()
-        self.win_attn = SetAttention(dim_model, nhead, dropout,
-                                     dim_feedforward, activation, batch_first,
-                                     mlp_dropout)
+        self.win_attn = SetAttention(
+            dim_model,
+            nhead,
+            dropout,
+            dim_feedforward,
+            activation,
+            batch_first,
+            mlp_dropout,
+        )
         self.norm = nn.LayerNorm(dim_model)
         self.dim_model = dim_model
 
@@ -286,22 +327,24 @@ class DSVTEncoderLayer(nn.Module):
 
 class SetAttention(nn.Module):
 
-    def __init__(self,
-                 dim_model,
-                 nhead,
-                 dropout,
-                 dim_feedforward=2048,
-                 activation='relu',
-                 batch_first=True,
-                 mlp_dropout=0):
+    def __init__(
+        self,
+        dim_model,
+        nhead,
+        dropout,
+        dim_feedforward=2048,
+        activation="relu",
+        batch_first=True,
+        mlp_dropout=0,
+    ):
         super().__init__()
         self.nhead = nhead
         if batch_first:
             self.self_attn = nn.MultiheadAttention(
-                dim_model, nhead, dropout=dropout, batch_first=batch_first)
+                dim_model, nhead, dropout=dropout, batch_first=batch_first
+            )
         else:
-            self.self_attn = nn.MultiheadAttention(
-                dim_model, nhead, dropout=dropout)
+            self.self_attn = nn.MultiheadAttention(dim_model, nhead, dropout=dropout)
 
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(dim_model, dim_feedforward)
@@ -316,7 +359,7 @@ class SetAttention(nn.Module):
         self.activation = _get_activation_fn(activation)
 
     def forward(self, src, pos=None, key_padding_mask=None, voxel_inds=None):
-        '''
+        """
         Args:
             src (Tensor[float]): Voxel features with shape (N, C), where N is
                 the number of voxels.
@@ -327,7 +370,7 @@ class SetAttention(nn.Module):
                 Shape of (set_num, set_size).
         Returns:
             src (Tensor[float]): Voxel features.
-        '''
+        """
         set_features = src[voxel_inds]
         if pos is not None:
             set_pos = pos[voxel_inds]
@@ -346,13 +389,10 @@ class SetAttention(nn.Module):
         # map voxel features from set space to voxel space:
         # (set_num, set_size, C) --> (N, C)
         flatten_inds = voxel_inds.reshape(-1)
-        unique_flatten_inds, inverse = torch.unique(
-            flatten_inds, return_inverse=True)
-        perm = torch.arange(
-            inverse.size(0), dtype=inverse.dtype, device=inverse.device)
+        unique_flatten_inds, inverse = torch.unique(flatten_inds, return_inverse=True)
+        perm = torch.arange(inverse.size(0), dtype=inverse.dtype, device=inverse.device)
         inverse, perm = inverse.flip([0]), perm.flip([0])
-        perm = inverse.new_empty(unique_flatten_inds.size(0)).scatter_(
-            0, inverse, perm)
+        perm = inverse.new_empty(unique_flatten_inds.size(0)).scatter_(0, inverse, perm)
         src2 = src2.reshape(-1, self.dim_model)[perm]
 
         # FFN layer
@@ -385,11 +425,9 @@ class StageReductionAttBlock(nn.Module):
         self.pool_volume = pool_volume
         self.query_func = torch.nn.MaxPool1d(pool_volume)
         self.norm = nn.LayerNorm(input_channel)
-        self.self_attn = nn.MultiheadAttention(
-            input_channel, 8, batch_first=True)
-        self.pos_embedding = nn.Parameter(
-            torch.randn(pool_volume, input_channel))
-        nn.init.normal_(self.pos_embedding, std=.01)
+        self.self_attn = nn.MultiheadAttention(input_channel, 8, batch_first=True)
+        self.pos_embedding = nn.Parameter(torch.randn(pool_volume, input_channel))
+        nn.init.normal_(self.pos_embedding, std=0.01)
 
     def forward(self, x, key_padding_mask):
         # x: [voxel_num, c_dim, pool_volume]
@@ -404,10 +442,10 @@ class StageReductionAttBlock(nn.Module):
 
 def _get_activation_fn(activation):
     """Return an activation function given a string."""
-    if activation == 'relu':
+    if activation == "relu":
         return torch.nn.functional.relu
-    if activation == 'gelu':
+    if activation == "gelu":
         return torch.nn.functional.gelu
-    if activation == 'glu':
+    if activation == "glu":
         return torch.nn.functional.glu
-    raise RuntimeError(F'activation should be relu/gelu, not {activation}.')
+    raise RuntimeError(f"activation should be relu/gelu, not {activation}.")

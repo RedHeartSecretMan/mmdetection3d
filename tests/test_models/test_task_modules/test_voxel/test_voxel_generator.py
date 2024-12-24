@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
-
 from mmdet3d.models.task_modules.voxel import VoxelGenerator
 
 

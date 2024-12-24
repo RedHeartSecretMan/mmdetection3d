@@ -2,9 +2,8 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
-from mmengine.structures import InstanceData
-
 from mmdet3d.structures import Det3DDataSample
+from mmengine.structures import InstanceData
 
 
 class NeRFDet3DDataSample(Det3DDataSample):
@@ -27,7 +26,7 @@ class NeRFDet3DDataSample(Det3DDataSample):
 
     @gt_nerf_images.setter
     def gt_nerf_images(self, value: InstanceData) -> None:
-        self.set_field(value, '_gt_nerf_images', dtype=InstanceData)
+        self.set_field(value, "_gt_nerf_images", dtype=InstanceData)
 
     @gt_nerf_images.deleter
     def gt_nerf_images(self) -> None:
@@ -39,7 +38,7 @@ class NeRFDet3DDataSample(Det3DDataSample):
 
     @gt_nerf_depths.setter
     def gt_nerf_depths(self, value: InstanceData) -> None:
-        self.set_field(value, '_gt_nerf_depths', dtype=InstanceData)
+        self.set_field(value, "_gt_nerf_depths", dtype=InstanceData)
 
     @gt_nerf_depths.deleter
     def gt_nerf_depths(self) -> None:
@@ -48,5 +47,9 @@ class NeRFDet3DDataSample(Det3DDataSample):
 
 SampleList = List[NeRFDet3DDataSample]
 OptSampleList = Optional[SampleList]
-ForwardResults = Union[Dict[str, torch.Tensor], List[NeRFDet3DDataSample],
-                       Tuple[torch.Tensor], torch.Tensor]
+ForwardResults = Union[
+    Dict[str, torch.Tensor],
+    List[NeRFDet3DDataSample],
+    Tuple[torch.Tensor],
+    torch.Tensor,
+]

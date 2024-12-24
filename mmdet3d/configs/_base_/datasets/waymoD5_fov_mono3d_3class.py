@@ -1,20 +1,20 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from mmengine.dataset.sampler import DefaultSampler
-
 from mmdet3d.datasets.transforms.formating import Pack3DDetInputs
-from mmdet3d.datasets.transforms.loading import (LoadAnnotations3D,
-                                                 LoadImageFromFileMono3D)
-from mmdet3d.datasets.transforms.transforms_3d import (RandomFlip3D,
-                                                       RandomResize3D)
+from mmdet3d.datasets.transforms.loading import (
+    LoadAnnotations3D,
+    LoadImageFromFileMono3D,
+)
+from mmdet3d.datasets.transforms.transforms_3d import RandomFlip3D, RandomResize3D
 from mmdet3d.datasets.waymo_dataset import WaymoDataset
 from mmdet3d.evaluation.metrics.waymo_metric import WaymoMetric
+from mmengine.dataset.sampler import DefaultSampler
 
 # dataset settings
 # D3 in the config name means the whole dataset is divided into 3 folds
 # We only use one fold for efficient experiments
-dataset_type = 'WaymoDataset'
-data_root = 'data/waymo/kitti_format/'
-class_names = ['Car', 'Pedestrian', 'Cyclist']
+dataset_type = "WaymoDataset"
+data_root = "data/waymo/kitti_format/"
+class_names = ["Car", "Pedestrian", "Cyclist"]
 input_modality = dict(use_lidar=False, use_camera=True)
 
 # Example to use different file client
@@ -41,7 +41,8 @@ train_pipeline = [
         with_attr_label=False,
         with_bbox_3d=True,
         with_label_3d=True,
-        with_bbox_depth=True),
+        with_bbox_depth=True,
+    ),
     # base shape (1248, 832), scale (0.95, 1.05)
     dict(
         type=RandomResize3D,
@@ -53,30 +54,32 @@ train_pipeline = [
     dict(
         type=Pack3DDetInputs,
         keys=[
-            'img', 'gt_bboxes', 'gt_bboxes_labels', 'gt_bboxes_3d',
-            'gt_labels_3d', 'centers_2d', 'depths'
-        ]),
+            "img",
+            "gt_bboxes",
+            "gt_bboxes_labels",
+            "gt_bboxes_3d",
+            "gt_labels_3d",
+            "centers_2d",
+            "depths",
+        ],
+    ),
 ]
 
 test_pipeline = [
     dict(type=LoadImageFromFileMono3D, backend_args=backend_args),
     dict(
-        type=RandomResize3D,
-        scale=(1248, 832),
-        ratio_range=(1., 1.),
-        keep_ratio=True),
-    dict(type=Pack3DDetInputs, keys=['img']),
+        type=RandomResize3D, scale=(1248, 832), ratio_range=(1.0, 1.0), keep_ratio=True
+    ),
+    dict(type=Pack3DDetInputs, keys=["img"]),
 ]
 # construct a pipeline for data and gt loading in show function
 # please keep its loading function consistent with test_pipeline (e.g. client)
 eval_pipeline = [
     dict(type=LoadImageFromFileMono3D, backend_args=backend_args),
     dict(
-        type=RandomResize3D,
-        scale=(1248, 832),
-        ratio_range=(1., 1.),
-        keep_ratio=True),
-    dict(type=Pack3DDetInputs, keys=['img']),
+        type=RandomResize3D, scale=(1248, 832), ratio_range=(1.0, 1.0), keep_ratio=True
+    ),
+    dict(type=Pack3DDetInputs, keys=["img"]),
 ]
 
 metainfo = dict(CLASSES=class_names)
@@ -89,25 +92,28 @@ train_dataloader = dict(
     dataset=dict(
         type=WaymoDataset,
         data_root=data_root,
-        ann_file='waymo_infos_train.pkl',
+        ann_file="waymo_infos_train.pkl",
         data_prefix=dict(
-            pts='training/velodyne',
-            CAM_FRONT='training/image_0',
-            CAM_FRONT_LEFT='training/image_1',
-            CAM_FRONT_RIGHT='training/image_2',
-            CAM_SIDE_LEFT='training/image_3',
-            CAM_SIDE_RIGHT='training/image_4'),
+            pts="training/velodyne",
+            CAM_FRONT="training/image_0",
+            CAM_FRONT_LEFT="training/image_1",
+            CAM_FRONT_RIGHT="training/image_2",
+            CAM_SIDE_LEFT="training/image_3",
+            CAM_SIDE_RIGHT="training/image_4",
+        ),
         pipeline=train_pipeline,
         modality=input_modality,
         test_mode=False,
         metainfo=metainfo,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='Camera',
-        load_type='fov_image_based',
+        box_type_3d="Camera",
+        load_type="fov_image_based",
         # load one frame every three frames
         load_interval=5,
-        backend_args=backend_args))
+        backend_args=backend_args,
+    ),
+)
 
 val_dataloader = dict(
     batch_size=1,
@@ -119,22 +125,25 @@ val_dataloader = dict(
         type=WaymoDataset,
         data_root=data_root,
         data_prefix=dict(
-            pts='training/velodyne',
-            CAM_FRONT='training/image_0',
-            CAM_FRONT_LEFT='training/image_1',
-            CAM_FRONT_RIGHT='training/image_2',
-            CAM_SIDE_LEFT='training/image_3',
-            CAM_SIDE_RIGHT='training/image_4'),
-        ann_file='waymo_infos_val.pkl',
+            pts="training/velodyne",
+            CAM_FRONT="training/image_0",
+            CAM_FRONT_LEFT="training/image_1",
+            CAM_FRONT_RIGHT="training/image_2",
+            CAM_SIDE_LEFT="training/image_3",
+            CAM_SIDE_RIGHT="training/image_4",
+        ),
+        ann_file="waymo_infos_val.pkl",
         pipeline=eval_pipeline,
         modality=input_modality,
         test_mode=True,
         metainfo=metainfo,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='Camera',
-        load_type='fov_image_based',
-        backend_args=backend_args))
+        box_type_3d="Camera",
+        load_type="fov_image_based",
+        backend_args=backend_args,
+    ),
+)
 
 test_dataloader = dict(
     batch_size=1,
@@ -146,29 +155,33 @@ test_dataloader = dict(
         type=WaymoDataset,
         data_root=data_root,
         data_prefix=dict(
-            pts='training/velodyne',
-            CAM_FRONT='training/image_0',
-            CAM_FRONT_LEFT='training/image_1',
-            CAM_FRONT_RIGHT='training/image_2',
-            CAM_SIDE_LEFT='training/image_3',
-            CAM_SIDE_RIGHT='training/image_4'),
-        ann_file='waymo_infos_val.pkl',
+            pts="training/velodyne",
+            CAM_FRONT="training/image_0",
+            CAM_FRONT_LEFT="training/image_1",
+            CAM_FRONT_RIGHT="training/image_2",
+            CAM_SIDE_LEFT="training/image_3",
+            CAM_SIDE_RIGHT="training/image_4",
+        ),
+        ann_file="waymo_infos_val.pkl",
         pipeline=eval_pipeline,
         modality=input_modality,
         test_mode=True,
         metainfo=metainfo,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='Camera',
-        load_type='fov_image_based',
-        backend_args=backend_args))
+        box_type_3d="Camera",
+        load_type="fov_image_based",
+        backend_args=backend_args,
+    ),
+)
 
 val_evaluator = dict(
     type=WaymoMetric,
-    ann_file='./data/waymo/kitti_format/waymo_infos_val.pkl',
-    waymo_bin_file='./data/waymo/waymo_format/fov_gt.bin',
-    data_root='./data/waymo/waymo_format',
-    metric='LET_mAP',
-    load_type='fov_image_based',
-    backend_args=backend_args)
+    ann_file="./data/waymo/kitti_format/waymo_infos_val.pkl",
+    waymo_bin_file="./data/waymo/waymo_format/fov_gt.bin",
+    data_root="./data/waymo/waymo_format",
+    metric="LET_mAP",
+    load_type="fov_image_based",
+    backend_args=backend_args,
+)
 test_evaluator = val_evaluator

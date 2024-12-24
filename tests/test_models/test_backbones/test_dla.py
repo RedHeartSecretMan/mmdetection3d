@@ -1,5 +1,4 @@
 import torch
-
 from mmdet3d.registry import MODELS
 
 
@@ -7,10 +6,8 @@ def test_dla_net():
     # test DLANet used in SMOKE
     # test list config
     cfg = dict(
-        type='DLANet',
-        depth=34,
-        in_channels=3,
-        norm_cfg=dict(type='GN', num_groups=32))
+        type="DLANet", depth=34, in_channels=3, norm_cfg=dict(type="GN", num_groups=32)
+    )
 
     img = torch.randn((4, 3, 32, 32))
     self = MODELS.build(cfg)

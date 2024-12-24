@@ -8,4 +8,4 @@ except ImportError:
 else:
     IS_TORCHSPARSE_AVAILABLE = register_torchsparse()
 
-__all__ = ['IS_TORCHSPARSE_AVAILABLE']
+__all__ = ["IS_TORCHSPARSE_AVAILABLE"]

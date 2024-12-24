@@ -3,12 +3,11 @@ from typing import Optional
 
 import torch
 from mmcv.ops.diff_iou_rotated import box2corners, oriented_box_intersection_2d
+from mmdet3d.models import rotated_iou_3d_loss
+from mmdet3d.registry import MODELS
 from mmdet.models.losses.utils import weighted_loss
 from torch import Tensor
 from torch import nn as nn
-
-from mmdet3d.models import rotated_iou_3d_loss
-from mmdet3d.registry import MODELS
 
 
 def diff_diou_rotated_3d(box3d1: Tensor, box3d2: Tensor) -> Tensor:
@@ -29,8 +28,7 @@ def diff_diou_rotated_3d(box3d1: Tensor, box3d2: Tensor) -> Tensor:
     zmin1 = box3d1[..., 2] - box3d1[..., 5] * 0.5
     zmax2 = box3d2[..., 2] + box3d2[..., 5] * 0.5
     zmin2 = box3d2[..., 2] - box3d2[..., 5] * 0.5
-    z_overlap = (torch.min(zmax1, zmax2) -
-                 torch.max(zmin1, zmin2)).clamp_(min=0.)
+    z_overlap = (torch.min(zmax1, zmax2) - torch.max(zmin1, zmin2)).clamp_(min=0.0)
     intersection_3d = intersection * z_overlap
     volume1 = box3d1[..., 3] * box3d1[..., 4] * box3d1[..., 5]
     volume2 = box3d2[..., 3] * box3d2[..., 4] * box3d2[..., 5]
@@ -54,8 +52,8 @@ def diff_diou_rotated_3d(box3d1: Tensor, box3d2: Tensor) -> Tensor:
     z_max = torch.max(zmax1, zmax2)
     z_min = torch.min(zmin1, zmin2)
 
-    r2 = ((box1[..., :3] - box2[..., :3])**2).sum(dim=-1)
-    c2 = (x_min - x_max)**2 + (y_min - y_max)**2 + (z_min - z_max)**2
+    r2 = ((box1[..., :3] - box2[..., :3]) ** 2).sum(dim=-1)
+    c2 = (x_min - x_max) ** 2 + (y_min - y_max) ** 2 + (z_min - z_max) ** 2
 
     return intersection_3d / union_3d - r2 / c2
 
@@ -74,8 +72,7 @@ def rotated_diou_3d_loss(pred: Tensor, target: Tensor) -> Tensor:
     Returns:
         torch.Tensor: IoU loss between predictions and targets.
     """
-    diou_loss = 1 - diff_diou_rotated_3d(
-        pred.unsqueeze(0), target.unsqueeze(0))[0]
+    diou_loss = 1 - diff_diou_rotated_3d(pred.unsqueeze(0), target.unsqueeze(0))[0]
     return diou_loss
 
 
@@ -94,25 +91,25 @@ class TR3DRotatedIoU3DLoss(nn.Module):
         loss_weight (float): Weight of loss. Defaults to 1.0.
     """
 
-    def __init__(self,
-                 mode: str = 'iou',
-                 reduction: str = 'mean',
-                 loss_weight: float = 1.0) -> None:
+    def __init__(
+        self, mode: str = "iou", reduction: str = "mean", loss_weight: float = 1.0
+    ) -> None:
         super(TR3DRotatedIoU3DLoss, self).__init__()
-        assert mode in ['iou', 'diou']
-        self.loss = rotated_iou_3d_loss if mode == 'iou' \
-            else rotated_diou_3d_loss
-        assert reduction in ['none', 'sum', 'mean']
+        assert mode in ["iou", "diou"]
+        self.loss = rotated_iou_3d_loss if mode == "iou" else rotated_diou_3d_loss
+        assert reduction in ["none", "sum", "mean"]
         self.reduction = reduction
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred: Tensor,
-                target: Tensor,
-                weight: Optional[Tensor] = None,
-                avg_factor: Optional[float] = None,
-                reduction_override: Optional[str] = None,
-                **kwargs) -> Tensor:
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        weight: Optional[Tensor] = None,
+        avg_factor: Optional[float] = None,
+        reduction_override: Optional[str] = None,
+        **kwargs
+    ) -> Tensor:
         """Forward function of loss calculation.
 
         Args:
@@ -133,17 +130,12 @@ class TR3DRotatedIoU3DLoss(nn.Module):
         """
         if weight is not None and not torch.any(weight > 0):
             return pred.sum() * weight.sum()  # 0
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
         if weight is not None and weight.dim() > 1:
             weight = weight.mean(-1)
         loss = self.loss_weight * self.loss(
-            pred,
-            target,
-            weight,
-            reduction=reduction,
-            avg_factor=avg_factor,
-            **kwargs)
+            pred, target, weight, reduction=reduction, avg_factor=avg_factor, **kwargs
+        )
 
         return loss

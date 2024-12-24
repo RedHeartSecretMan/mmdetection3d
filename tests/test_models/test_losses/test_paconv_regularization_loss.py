@@ -37,7 +37,7 @@ def test_paconv_regularization_loss():
 
             self.paconvs = nn.ModuleList()
             self.paconvs.append(PAConv(8, 16, 8))
-            self.paconvs.append(PAConv(8, 16, 8, kernel_input='identity'))
+            self.paconvs.append(PAConv(8, 16, 8, kernel_input="identity"))
             self.paconvs.append(PAConvCUDA(8, 16, 8))
 
             self.conv1 = nn.Conv1d(3, 8, 1)
@@ -47,17 +47,16 @@ def test_paconv_regularization_loss():
 
     # reduction should be in ['none', 'mean', 'sum']
     with pytest.raises(AssertionError):
-        paconv_corr_loss = PAConvRegularizationLoss(reduction='l2')
+        paconv_corr_loss = PAConvRegularizationLoss(reduction="l2")
 
-    paconv_corr_loss = PAConvRegularizationLoss(reduction='mean')
+    paconv_corr_loss = PAConvRegularizationLoss(reduction="mean")
     mean_corr_loss = paconv_corr_loss(model.modules())
     assert mean_corr_loss >= 0
     assert mean_corr_loss.requires_grad
 
-    sum_corr_loss = paconv_corr_loss(model.modules(), reduction_override='sum')
+    sum_corr_loss = paconv_corr_loss(model.modules(), reduction_override="sum")
     assert torch.allclose(sum_corr_loss, mean_corr_loss * 3)
 
-    none_corr_loss = paconv_corr_loss(
-        model.modules(), reduction_override='none')
+    none_corr_loss = paconv_corr_loss(model.modules(), reduction_override="none")
     assert none_corr_loss.shape[0] == 3
     assert torch.allclose(none_corr_loss.mean(), mean_corr_loss)

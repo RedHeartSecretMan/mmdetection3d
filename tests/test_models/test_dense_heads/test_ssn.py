@@ -1,11 +1,9 @@
 import unittest
 
 import torch
-from mmengine import DefaultScope
-
 from mmdet3d.registry import MODELS
-from mmdet3d.testing import (create_detector_inputs, get_detector_cfg,
-                             setup_seed)
+from mmdet3d.testing import create_detector_inputs, get_detector_cfg, setup_seed
+from mmengine import DefaultScope
 
 
 class TestSSN(unittest.TestCase):
@@ -13,11 +11,10 @@ class TestSSN(unittest.TestCase):
     def test_ssn(self):
         import mmdet3d.models
 
-        assert hasattr(mmdet3d.models.dense_heads, 'ShapeAwareHead')
-        DefaultScope.get_instance('test_ssn', scope_name='mmdet3d')
+        assert hasattr(mmdet3d.models.dense_heads, "ShapeAwareHead")
+        DefaultScope.get_instance("test_ssn", scope_name="mmdet3d")
         setup_seed(0)
-        ssn_cfg = get_detector_cfg(
-            'ssn/ssn_hv_secfpn_sbn-all_16xb2-2x_nus-3d.py')
+        ssn_cfg = get_detector_cfg("ssn/ssn_hv_secfpn_sbn-all_16xb2-2x_nus-3d.py")
         ssn_cfg.pts_voxel_encoder.feat_channels = [1, 1]
         ssn_cfg.pts_middle_encoder.in_channels = 1
         ssn_cfg.pts_backbone.in_channels = 1
@@ -29,7 +26,8 @@ class TestSSN(unittest.TestCase):
         model = MODELS.build(ssn_cfg)
         num_gt_instance = 50
         packed_inputs = create_detector_inputs(
-            num_gt_instance=num_gt_instance, gt_bboxes_dim=9)
+            num_gt_instance=num_gt_instance, gt_bboxes_dim=9
+        )
 
         # TODO: Support aug_test
         # aug_data = [
@@ -53,11 +51,11 @@ class TestSSN(unittest.TestCase):
             # test simple_test
             with torch.no_grad():
                 data = model.data_preprocessor(packed_inputs, True)
-                results = model.forward(**data, mode='predict')
+                results = model.forward(**data, mode="predict")
             self.assertEqual(len(results), 1)
-            self.assertIn('bboxes_3d', results[0].pred_instances_3d)
-            self.assertIn('scores_3d', results[0].pred_instances_3d)
-            self.assertIn('labels_3d', results[0].pred_instances_3d)
+            self.assertIn("bboxes_3d", results[0].pred_instances_3d)
+            self.assertIn("scores_3d", results[0].pred_instances_3d)
+            self.assertIn("labels_3d", results[0].pred_instances_3d)
 
             # TODO: Support aug_test
             # batch_inputs, data_samples = model.data_preprocessor(
@@ -72,8 +70,8 @@ class TestSSN(unittest.TestCase):
             # self.assertIn('scores_3d', aug_results[1].pred_instances_3d)
             # self.assertIn('labels_3d', aug_results[1].pred_instances_3d)
 
-            losses = model.forward(**data, mode='loss')
+            losses = model.forward(**data, mode="loss")
 
-            self.assertGreaterEqual(losses['loss_cls'][0], 0)
-            self.assertGreaterEqual(losses['loss_bbox'][0], 0)
-            self.assertGreaterEqual(losses['loss_dir'][0], 0)
+            self.assertGreaterEqual(losses["loss_cls"][0], 0)
+            self.assertGreaterEqual(losses["loss_bbox"][0], 0)
+            self.assertGreaterEqual(losses["loss_dir"][0], 0)

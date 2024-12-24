@@ -10,10 +10,9 @@ except ImportError:
     ME = SparseTensor = None
     pass
 
+from mmdet3d.registry import MODELS
 from mmengine.model import BaseModule
 from torch import nn
-
-from mmdet3d.registry import MODELS
 
 
 @MODELS.register_module()
@@ -39,22 +38,23 @@ class TR3DNeck(BaseModule):
         for i in range(len(in_channels)):
             if i > 0:
                 self.add_module(
-                    f'up_block_{i}',
-                    self._make_block(in_channels[i], in_channels[i - 1], True,
-                                     2))
+                    f"up_block_{i}",
+                    self._make_block(in_channels[i], in_channels[i - 1], True, 2),
+                )
             if i < len(in_channels) - 1:
                 self.add_module(
-                    f'lateral_block_{i}',
-                    self._make_block(in_channels[i], in_channels[i]))
-                self.add_module(f'out_block_{i}',
-                                self._make_block(in_channels[i], out_channels))
+                    f"lateral_block_{i}",
+                    self._make_block(in_channels[i], in_channels[i]),
+                )
+                self.add_module(
+                    f"out_block_{i}", self._make_block(in_channels[i], out_channels)
+                )
 
     def init_weights(self):
         """Initialize weights."""
         for m in self.modules():
             if isinstance(m, ME.MinkowskiConvolution):
-                ME.utils.kaiming_normal_(
-                    m.kernel, mode='fan_out', nonlinearity='relu')
+                ME.utils.kaiming_normal_(m.kernel, mode="fan_out", nonlinearity="relu")
 
             if isinstance(m, ME.MinkowskiBatchNorm):
                 nn.init.constant_(m.bn.weight, 1)
@@ -75,18 +75,17 @@ class TR3DNeck(BaseModule):
         x = inputs[-1]
         for i in range(len(inputs) - 1, -1, -1):
             if i < len(inputs) - 1:
-                x = self.__getattr__(f'up_block_{i + 1}')(x)
+                x = self.__getattr__(f"up_block_{i + 1}")(x)
                 x = inputs[i] + x
-                x = self.__getattr__(f'lateral_block_{i}')(x)
-                out = self.__getattr__(f'out_block_{i}')(x)
+                x = self.__getattr__(f"lateral_block_{i}")(x)
+                out = self.__getattr__(f"out_block_{i}")(x)
                 outs.append(out)
         return outs[::-1]
 
     @staticmethod
-    def _make_block(in_channels: int,
-                    out_channels: int,
-                    generative: bool = False,
-                    stride: int = 1) -> nn.Module:
+    def _make_block(
+        in_channels: int, out_channels: int, generative: bool = False, stride: int = 1
+    ) -> nn.Module:
         """Construct Conv-Norm-Act block.
 
         Args:
@@ -99,13 +98,13 @@ class TR3DNeck(BaseModule):
         Returns:
             torch.nn.Module: With corresponding layers.
         """
-        conv = ME.MinkowskiGenerativeConvolutionTranspose if generative \
+        conv = (
+            ME.MinkowskiGenerativeConvolutionTranspose
+            if generative
             else ME.MinkowskiConvolution
+        )
         return nn.Sequential(
-            conv(
-                in_channels,
-                out_channels,
-                kernel_size=3,
-                stride=stride,
-                dimension=3), ME.MinkowskiBatchNorm(out_channels),
-            ME.MinkowskiReLU(inplace=True))
+            conv(in_channels, out_channels, kernel_size=3, stride=stride, dimension=3),
+            ME.MinkowskiBatchNorm(out_channels),
+            ME.MinkowskiReLU(inplace=True),
+        )

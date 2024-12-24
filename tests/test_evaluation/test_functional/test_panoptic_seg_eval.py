@@ -2,7 +2,6 @@
 import numpy as np
 import pytest
 import torch
-
 from mmdet3d.evaluation.functional.panoptic_seg_eval import panoptic_seg_eval
 
 
@@ -10,17 +9,17 @@ def test_panoptic_seg_eval():
     if not torch.cuda.is_available():
         pytest.skip()
 
-    classes = ['unlabeled', 'person', 'dog', 'grass', 'sky']
+    classes = ["unlabeled", "person", "dog", "grass", "sky"]
     label2cat = {
-        0: 'unlabeled',
-        1: 'person',
-        2: 'dog',
-        3: 'grass',
-        4: 'sky',
+        0: "unlabeled",
+        1: "person",
+        2: "dog",
+        3: "grass",
+        4: "sky",
     }
 
-    thing_classes = ['person', 'dog']
-    stuff_classes = ['grass', 'sky']
+    thing_classes = ["person", "dog"]
+    stuff_classes = ["grass", "sky"]
     ignore_index = [0]  # only ignore ignore class
     min_points = 1  # for this example we care about all points
     offset = 2**16
@@ -42,8 +41,7 @@ def test_panoptic_seg_eval():
     num_grass = 50
     num_grass_pred = 40  # rest is sky
     semantic_preds.extend([1 for i in range(num_grass_pred)])  # grass
-    semantic_preds.extend([2
-                           for i in range(num_grass - num_grass_pred)])  # sky
+    semantic_preds.extend([2 for i in range(num_grass - num_grass_pred)])  # sky
     instance_preds.extend([0 for i in range(num_grass)])
     gt_semantic.extend([1 for i in range(num_grass)])  # grass
     gt_instance.extend([0 for i in range(num_grass)])
@@ -81,21 +79,25 @@ def test_panoptic_seg_eval():
     gt_semantic = np.array(gt_semantic, dtype=int).reshape(1, -1)
     gt_instance = np.array(gt_instance, dtype=int).reshape(1, -1)
 
-    gt_labels = [{
-        'pts_semantic_mask': gt_semantic,
-        'pts_instance_mask': gt_instance
-    }]
+    gt_labels = [{"pts_semantic_mask": gt_semantic, "pts_instance_mask": gt_instance}]
 
-    seg_preds = [{
-        'pts_semantic_mask': semantic_preds,
-        'pts_instance_mask': instance_preds
-    }]
+    seg_preds = [
+        {"pts_semantic_mask": semantic_preds, "pts_instance_mask": instance_preds}
+    ]
 
-    ret_value = panoptic_seg_eval(gt_labels, seg_preds, classes, thing_classes,
-                                  stuff_classes, min_points, offset, label2cat,
-                                  ignore_index)
+    ret_value = panoptic_seg_eval(
+        gt_labels,
+        seg_preds,
+        classes,
+        thing_classes,
+        stuff_classes,
+        min_points,
+        offset,
+        label2cat,
+        ignore_index,
+    )
 
-    assert np.isclose(ret_value['pq'], 0.47916666666666663)
-    assert np.isclose(ret_value['rq_mean'], 0.6666666666666666)
-    assert np.isclose(ret_value['sq_mean'], 0.5520833333333333)
-    assert np.isclose(ret_value['miou'], 0.5476190476190476)
+    assert np.isclose(ret_value["pq"], 0.47916666666666663)
+    assert np.isclose(ret_value["rq_mean"], 0.6666666666666666)
+    assert np.isclose(ret_value["sq_mean"], 0.5520833333333333)
+    assert np.isclose(ret_value["miou"], 0.5476190476190476)

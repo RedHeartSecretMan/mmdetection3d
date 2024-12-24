@@ -2,7 +2,6 @@ from typing import List
 
 import numpy as np
 from mmcv import BaseTransform
-
 from mmdet3d.registry import TRANSFORMS
 
 
@@ -36,8 +35,8 @@ class ObjectRangeFilter3D(BaseTransform):
             dict: Results after filtering, 'gt_bboxes_3d', 'gt_labels_3d'
             keys are updated in the result dict.
         """
-        gt_bboxes_3d = input_dict['gt_bboxes_3d']
-        gt_labels_3d = input_dict['gt_labels_3d']
+        gt_bboxes_3d = input_dict["gt_bboxes_3d"]
+        gt_labels_3d = input_dict["gt_labels_3d"]
         mask = gt_bboxes_3d.in_range_3d(self.pcd_range)
         gt_bboxes_3d = gt_bboxes_3d[mask]
         # mask is a torch tensor but gt_labels_3d is still numpy array
@@ -48,15 +47,15 @@ class ObjectRangeFilter3D(BaseTransform):
 
         # limit rad to [-pi, pi]
         gt_bboxes_3d.limit_yaw(offset=0.5, period=2 * np.pi)
-        input_dict['gt_bboxes_3d'] = gt_bboxes_3d
-        input_dict['gt_labels_3d'] = gt_labels_3d
+        input_dict["gt_bboxes_3d"] = gt_bboxes_3d
+        input_dict["gt_labels_3d"] = gt_labels_3d
 
         return input_dict
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        repr_str += f'(point_cloud_range={self.pcd_range.tolist()})'
+        repr_str += f"(point_cloud_range={self.pcd_range.tolist()})"
         return repr_str
 
 
@@ -92,25 +91,25 @@ class PointsRangeFilter3D(BaseTransform):
             dict: Results after filtering, 'points', 'pts_instance_mask'
             and 'pts_semantic_mask' keys are updated in the result dict.
         """
-        points = input_dict['points']
+        points = input_dict["points"]
         points_mask = points.in_range_bev(self.pcd_range[[0, 1, 3, 4]])
         clean_points = points[points_mask]
-        input_dict['points'] = clean_points
+        input_dict["points"] = clean_points
         points_mask = points_mask.numpy()
 
-        pts_instance_mask = input_dict.get('pts_instance_mask', None)
-        pts_semantic_mask = input_dict.get('pts_semantic_mask', None)
+        pts_instance_mask = input_dict.get("pts_instance_mask", None)
+        pts_semantic_mask = input_dict.get("pts_semantic_mask", None)
 
         if pts_instance_mask is not None:
-            input_dict['pts_instance_mask'] = pts_instance_mask[points_mask]
+            input_dict["pts_instance_mask"] = pts_instance_mask[points_mask]
 
         if pts_semantic_mask is not None:
-            input_dict['pts_semantic_mask'] = pts_semantic_mask[points_mask]
+            input_dict["pts_semantic_mask"] = pts_semantic_mask[points_mask]
 
         return input_dict
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        repr_str += f'(point_cloud_range={self.pcd_range.tolist()})'
+        repr_str += f"(point_cloud_range={self.pcd_range.tolist()})"
         return repr_str

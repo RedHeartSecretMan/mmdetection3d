@@ -1,12 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import List
 
+from mmdet3d.registry import HOOKS
 from mmengine.dataset import BaseDataset
 from mmengine.hooks import Hook
 from mmengine.model import is_model_wrapper
 from mmengine.runner import Runner
-
-from mmdet3d.registry import HOOKS
 
 
 @HOOKS.register_module()
@@ -21,9 +20,7 @@ class DisableAugHook(Hook):
             be closed in the training. Defaults to [].
     """
 
-    def __init__(self,
-                 disable_after_epoch: int = 15,
-                 disable_aug_list: List = []):
+    def __init__(self, disable_after_epoch: int = 15, disable_aug_list: List = []):
         self.disable_after_epoch = disable_after_epoch
         self.disable_aug_list = disable_aug_list
         self._restart_dataloader = False
@@ -51,14 +48,15 @@ class DisableAugHook(Hook):
                 if transform.__class__.__name__ not in self.disable_aug_list:
                     new_transforms.append(transform)
                 else:
-                    runner.logger.info(
-                        f'Disable {transform.__class__.__name__}')
+                    runner.logger.info(f"Disable {transform.__class__.__name__}")
             dataset.pipeline.transforms = new_transforms
             # The dataset pipeline cannot be updated when persistent_workers
             # is True, so we need to force the dataloader's multi-process
             # restart. This is a very hacky approach.
-            if hasattr(train_loader, 'persistent_workers'
-                       ) and train_loader.persistent_workers is True:
+            if (
+                hasattr(train_loader, "persistent_workers")
+                and train_loader.persistent_workers is True
+            ):
                 train_loader._DataLoader__initialized = False
                 train_loader._iterator = None
                 self._restart_dataloader = True

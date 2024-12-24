@@ -3,25 +3,27 @@ import warnings
 from abc import ABCMeta
 from typing import Optional, Tuple
 
+from mmdet3d.utils import OptMultiConfig
 from mmengine.model import BaseModule
 from torch import Tensor
-
-from mmdet3d.utils import OptMultiConfig
 
 
 class BasePointNet(BaseModule, metaclass=ABCMeta):
     """Base class for PointNet."""
 
-    def __init__(self,
-                 init_cfg: OptMultiConfig = None,
-                 pretrained: Optional[str] = None):
+    def __init__(
+        self, init_cfg: OptMultiConfig = None, pretrained: Optional[str] = None
+    ):
         super(BasePointNet, self).__init__(init_cfg)
-        assert not (init_cfg and pretrained), \
-            'init_cfg and pretrained cannot be setting at the same time'
+        assert not (
+            init_cfg and pretrained
+        ), "init_cfg and pretrained cannot be setting at the same time"
         if isinstance(pretrained, str):
-            warnings.warn('DeprecationWarning: pretrained is a deprecated, '
-                          'please use "init_cfg" instead')
-            self.init_cfg = dict(type='Pretrained', checkpoint=pretrained)
+            warnings.warn(
+                "DeprecationWarning: pretrained is a deprecated, "
+                'please use "init_cfg" instead'
+            )
+            self.init_cfg = dict(type="Pretrained", checkpoint=pretrained)
 
     @staticmethod
     def _split_point_feats(points: Tensor) -> Tuple[Tensor, Optional[Tensor]]:

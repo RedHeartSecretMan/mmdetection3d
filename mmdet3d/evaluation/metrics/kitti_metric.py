@@ -6,14 +6,17 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import mmengine
 import numpy as np
 import torch
+from mmdet3d.evaluation import kitti_eval
+from mmdet3d.registry import METRICS
+from mmdet3d.structures import (
+    Box3DMode,
+    CameraInstance3DBoxes,
+    LiDARInstance3DBoxes,
+    points_cam2img,
+)
 from mmengine import load
 from mmengine.evaluator import BaseMetric
 from mmengine.logging import MMLogger, print_log
-
-from mmdet3d.evaluation import kitti_eval
-from mmdet3d.registry import METRICS
-from mmdet3d.structures import (Box3DMode, CameraInstance3DBoxes,
-                                LiDARInstance3DBoxes, points_cam2img)
 
 
 @METRICS.register_module()
@@ -49,40 +52,42 @@ class KittiMetric(BaseMetric):
             corresponding backend. Defaults to None.
     """
 
-    def __init__(self,
-                 ann_file: str,
-                 metric: Union[str, List[str]] = 'bbox',
-                 pcd_limit_range: List[float] = [0, -40, -3, 70.4, 40, 0.0],
-                 prefix: Optional[str] = None,
-                 pklfile_prefix: Optional[str] = None,
-                 default_cam_key: str = 'CAM2',
-                 format_only: bool = False,
-                 submission_prefix: Optional[str] = None,
-                 collect_device: str = 'cpu',
-                 backend_args: Optional[dict] = None) -> None:
-        self.default_prefix = 'Kitti metric'
-        super(KittiMetric, self).__init__(
-            collect_device=collect_device, prefix=prefix)
+    def __init__(
+        self,
+        ann_file: str,
+        metric: Union[str, List[str]] = "bbox",
+        pcd_limit_range: List[float] = [0, -40, -3, 70.4, 40, 0.0],
+        prefix: Optional[str] = None,
+        pklfile_prefix: Optional[str] = None,
+        default_cam_key: str = "CAM2",
+        format_only: bool = False,
+        submission_prefix: Optional[str] = None,
+        collect_device: str = "cpu",
+        backend_args: Optional[dict] = None,
+    ) -> None:
+        self.default_prefix = "Kitti metric"
+        super(KittiMetric, self).__init__(collect_device=collect_device, prefix=prefix)
         self.pcd_limit_range = pcd_limit_range
         self.ann_file = ann_file
         self.pklfile_prefix = pklfile_prefix
         self.format_only = format_only
         if self.format_only:
-            assert submission_prefix is not None, 'submission_prefix must be '
-            'not None when format_only is True, otherwise the result files '
-            'will be saved to a temp directory which will be cleaned up at '
-            'the end.'
+            assert submission_prefix is not None, "submission_prefix must be "
+            "not None when format_only is True, otherwise the result files "
+            "will be saved to a temp directory which will be cleaned up at "
+            "the end."
 
         self.submission_prefix = submission_prefix
         self.default_cam_key = default_cam_key
         self.backend_args = backend_args
 
-        allowed_metrics = ['bbox', 'img_bbox', 'mAP', 'LET_mAP']
+        allowed_metrics = ["bbox", "img_bbox", "mAP", "LET_mAP"]
         self.metrics = metric if isinstance(metric, list) else [metric]
         for metric in self.metrics:
             if metric not in allowed_metrics:
-                raise KeyError("metric should be one of 'bbox', 'img_bbox', "
-                               f'but got {metric}.')
+                raise KeyError(
+                    "metric should be one of 'bbox', 'img_bbox', " f"but got {metric}."
+                )
 
     def convert_annos_to_kitti_annos(self, data_infos: dict) -> List[dict]:
         """Convert loading annotations to Kitti annotations.
@@ -94,52 +99,50 @@ class KittiMetric(BaseMetric):
         Returns:
             List[dict]: List of Kitti annotations.
         """
-        data_annos = data_infos['data_list']
+        data_annos = data_infos["data_list"]
         if not self.format_only:
-            cat2label = data_infos['metainfo']['categories']
+            cat2label = data_infos["metainfo"]["categories"]
             label2cat = dict((v, k) for (k, v) in cat2label.items())
-            assert 'instances' in data_annos[0]
+            assert "instances" in data_annos[0]
             for i, annos in enumerate(data_annos):
-                if len(annos['instances']) == 0:
+                if len(annos["instances"]) == 0:
                     kitti_annos = {
-                        'name': np.array([]),
-                        'truncated': np.array([]),
-                        'occluded': np.array([]),
-                        'alpha': np.array([]),
-                        'bbox': np.zeros([0, 4]),
-                        'dimensions': np.zeros([0, 3]),
-                        'location': np.zeros([0, 3]),
-                        'rotation_y': np.array([]),
-                        'score': np.array([]),
+                        "name": np.array([]),
+                        "truncated": np.array([]),
+                        "occluded": np.array([]),
+                        "alpha": np.array([]),
+                        "bbox": np.zeros([0, 4]),
+                        "dimensions": np.zeros([0, 3]),
+                        "location": np.zeros([0, 3]),
+                        "rotation_y": np.array([]),
+                        "score": np.array([]),
                     }
                 else:
                     kitti_annos = {
-                        'name': [],
-                        'truncated': [],
-                        'occluded': [],
-                        'alpha': [],
-                        'bbox': [],
-                        'location': [],
-                        'dimensions': [],
-                        'rotation_y': [],
-                        'score': []
+                        "name": [],
+                        "truncated": [],
+                        "occluded": [],
+                        "alpha": [],
+                        "bbox": [],
+                        "location": [],
+                        "dimensions": [],
+                        "rotation_y": [],
+                        "score": [],
                     }
-                    for instance in annos['instances']:
-                        label = instance['bbox_label']
-                        kitti_annos['name'].append(label2cat[label])
-                        kitti_annos['truncated'].append(instance['truncated'])
-                        kitti_annos['occluded'].append(instance['occluded'])
-                        kitti_annos['alpha'].append(instance['alpha'])
-                        kitti_annos['bbox'].append(instance['bbox'])
-                        kitti_annos['location'].append(instance['bbox_3d'][:3])
-                        kitti_annos['dimensions'].append(
-                            instance['bbox_3d'][3:6])
-                        kitti_annos['rotation_y'].append(
-                            instance['bbox_3d'][6])
-                        kitti_annos['score'].append(instance['score'])
+                    for instance in annos["instances"]:
+                        label = instance["bbox_label"]
+                        kitti_annos["name"].append(label2cat[label])
+                        kitti_annos["truncated"].append(instance["truncated"])
+                        kitti_annos["occluded"].append(instance["occluded"])
+                        kitti_annos["alpha"].append(instance["alpha"])
+                        kitti_annos["bbox"].append(instance["bbox"])
+                        kitti_annos["location"].append(instance["bbox_3d"][:3])
+                        kitti_annos["dimensions"].append(instance["bbox_3d"][3:6])
+                        kitti_annos["rotation_y"].append(instance["bbox_3d"][6])
+                        kitti_annos["score"].append(instance["score"])
                     for name in kitti_annos:
                         kitti_annos[name] = np.array(kitti_annos[name])
-                data_annos[i]['kitti_annos'] = kitti_annos
+                data_annos[i]["kitti_annos"] = kitti_annos
         return data_annos
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
@@ -155,16 +158,16 @@ class KittiMetric(BaseMetric):
 
         for data_sample in data_samples:
             result = dict()
-            pred_3d = data_sample['pred_instances_3d']
-            pred_2d = data_sample['pred_instances']
+            pred_3d = data_sample["pred_instances_3d"]
+            pred_2d = data_sample["pred_instances"]
             for attr_name in pred_3d:
-                pred_3d[attr_name] = pred_3d[attr_name].to('cpu')
-            result['pred_instances_3d'] = pred_3d
+                pred_3d[attr_name] = pred_3d[attr_name].to("cpu")
+            result["pred_instances_3d"] = pred_3d
             for attr_name in pred_2d:
-                pred_2d[attr_name] = pred_2d[attr_name].to('cpu')
-            result['pred_instances'] = pred_2d
-            sample_idx = data_sample['sample_idx']
-            result['sample_idx'] = sample_idx
+                pred_2d[attr_name] = pred_2d[attr_name].to("cpu")
+            result["pred_instances"] = pred_2d
+            sample_idx = data_sample["sample_idx"]
+            result["sample_idx"] = sample_idx
             self.results.append(result)
 
     def compute_metrics(self, results: List[dict]) -> Dict[str, float]:
@@ -178,7 +181,7 @@ class KittiMetric(BaseMetric):
             the metrics, and the values are corresponding results.
         """
         logger: MMLogger = MMLogger.get_current_instance()
-        self.classes = self.dataset_meta['classes']
+        self.classes = self.dataset_meta["classes"]
 
         # load annotations
         pkl_infos = load(self.ann_file, backend_args=self.backend_args)
@@ -187,18 +190,17 @@ class KittiMetric(BaseMetric):
             results,
             pklfile_prefix=self.pklfile_prefix,
             submission_prefix=self.submission_prefix,
-            classes=self.classes)
+            classes=self.classes,
+        )
 
         metric_dict = {}
 
         if self.format_only:
-            logger.info(
-                f'results are saved in {osp.dirname(self.submission_prefix)}')
+            logger.info(f"results are saved in {osp.dirname(self.submission_prefix)}")
             return metric_dict
 
         gt_annos = [
-            self.data_infos[result['sample_idx']]['kitti_annos']
-            for result in results
+            self.data_infos[result["sample_idx"]]["kitti_annos"] for result in results
         ]
 
         for metric in self.metrics:
@@ -207,7 +209,8 @@ class KittiMetric(BaseMetric):
                 gt_annos,
                 metric=metric,
                 logger=logger,
-                classes=self.classes)
+                classes=self.classes,
+            )
             for result in ap_dict:
                 metric_dict[result] = ap_dict[result]
 
@@ -215,12 +218,14 @@ class KittiMetric(BaseMetric):
             tmp_dir.cleanup()
         return metric_dict
 
-    def kitti_evaluate(self,
-                       results_dict: dict,
-                       gt_annos: List[dict],
-                       metric: Optional[str] = None,
-                       classes: Optional[List[str]] = None,
-                       logger: Optional[MMLogger] = None) -> Dict[str, float]:
+    def kitti_evaluate(
+        self,
+        results_dict: dict,
+        gt_annos: List[dict],
+        metric: Optional[str] = None,
+        classes: Optional[List[str]] = None,
+        logger: Optional[MMLogger] = None,
+    ) -> Dict[str, float]:
         """Evaluation in KITTI protocol.
 
         Args:
@@ -237,16 +242,17 @@ class KittiMetric(BaseMetric):
         """
         ap_dict = dict()
         for name in results_dict:
-            if name == 'pred_instances' or metric == 'img_bbox':
-                eval_types = ['bbox']
+            if name == "pred_instances" or metric == "img_bbox":
+                eval_types = ["bbox"]
             else:
-                eval_types = ['bbox', 'bev', '3d']
+                eval_types = ["bbox", "bev", "3d"]
             ap_result_str, ap_dict_ = kitti_eval(
-                gt_annos, results_dict[name], classes, eval_types=eval_types)
+                gt_annos, results_dict[name], classes, eval_types=eval_types
+            )
             for ap_type, ap in ap_dict_.items():
-                ap_dict[f'{name}/{ap_type}'] = float(f'{ap:.4f}')
+                ap_dict[f"{name}/{ap_type}"] = float(f"{ap:.4f}")
 
-            print_log(f'Results of {name}:\n' + ap_result_str, logger=logger)
+            print_log(f"Results of {name}:\n" + ap_result_str, logger=logger)
 
         return ap_dict
 
@@ -255,7 +261,7 @@ class KittiMetric(BaseMetric):
         results: List[dict],
         pklfile_prefix: Optional[str] = None,
         submission_prefix: Optional[str] = None,
-        classes: Optional[List[str]] = None
+        classes: Optional[List[str]] = None,
     ) -> Tuple[dict, Union[tempfile.TemporaryDirectory, None]]:
         """Format the results to pkl file.
 
@@ -279,44 +285,55 @@ class KittiMetric(BaseMetric):
         """
         if pklfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
-            pklfile_prefix = osp.join(tmp_dir.name, 'results')
+            pklfile_prefix = osp.join(tmp_dir.name, "results")
         else:
             tmp_dir = None
         result_dict = dict()
-        sample_idx_list = [result['sample_idx'] for result in results]
+        sample_idx_list = [result["sample_idx"] for result in results]
         for name in results[0]:
             if submission_prefix is not None:
                 submission_prefix_ = osp.join(submission_prefix, name)
             else:
                 submission_prefix_ = None
             if pklfile_prefix is not None:
-                pklfile_prefix_ = osp.join(pklfile_prefix, name) + '.pkl'
+                pklfile_prefix_ = osp.join(pklfile_prefix, name) + ".pkl"
             else:
                 pklfile_prefix_ = None
-            if 'pred_instances' in name and '3d' in name and name[
-                    0] != '_' and results[0][name]:
+            if (
+                "pred_instances" in name
+                and "3d" in name
+                and name[0] != "_"
+                and results[0][name]
+            ):
                 net_outputs = [result[name] for result in results]
-                result_list_ = self.bbox2result_kitti(net_outputs,
-                                                      sample_idx_list, classes,
-                                                      pklfile_prefix_,
-                                                      submission_prefix_)
+                result_list_ = self.bbox2result_kitti(
+                    net_outputs,
+                    sample_idx_list,
+                    classes,
+                    pklfile_prefix_,
+                    submission_prefix_,
+                )
                 result_dict[name] = result_list_
-            elif name == 'pred_instances' and name[0] != '_' and results[0][
-                    name]:
+            elif name == "pred_instances" and name[0] != "_" and results[0][name]:
                 net_outputs = [result[name] for result in results]
                 result_list_ = self.bbox2result_kitti2d(
-                    net_outputs, sample_idx_list, classes, pklfile_prefix_,
-                    submission_prefix_)
+                    net_outputs,
+                    sample_idx_list,
+                    classes,
+                    pklfile_prefix_,
+                    submission_prefix_,
+                )
                 result_dict[name] = result_list_
         return result_dict, tmp_dir
 
     def bbox2result_kitti(
-            self,
-            net_outputs: List[dict],
-            sample_idx_list: List[int],
-            class_names: List[str],
-            pklfile_prefix: Optional[str] = None,
-            submission_prefix: Optional[str] = None) -> List[dict]:
+        self,
+        net_outputs: List[dict],
+        sample_idx_list: List[int],
+        class_names: List[str],
+        pklfile_prefix: Optional[str] = None,
+        submission_prefix: Optional[str] = None,
+    ) -> List[dict]:
         """Convert 3D detection results to kitti format for evaluation and test
         submission.
 
@@ -333,117 +350,131 @@ class KittiMetric(BaseMetric):
         Returns:
             List[dict]: A list of dictionaries with the kitti format.
         """
-        assert len(net_outputs) == len(self.data_infos), \
-            'invalid list length of network outputs'
+        assert len(net_outputs) == len(
+            self.data_infos
+        ), "invalid list length of network outputs"
         if submission_prefix is not None:
             mmengine.mkdir_or_exist(submission_prefix)
 
         det_annos = []
-        print('\nConverting 3D prediction to KITTI format')
-        for idx, pred_dicts in enumerate(
-                mmengine.track_iter_progress(net_outputs)):
+        print("\nConverting 3D prediction to KITTI format")
+        for idx, pred_dicts in enumerate(mmengine.track_iter_progress(net_outputs)):
             sample_idx = sample_idx_list[idx]
             info = self.data_infos[sample_idx]
             # Here default used 'CAM2' to compute metric. If you want to
             # use another camera, please modify it.
-            image_shape = (info['images'][self.default_cam_key]['height'],
-                           info['images'][self.default_cam_key]['width'])
+            image_shape = (
+                info["images"][self.default_cam_key]["height"],
+                info["images"][self.default_cam_key]["width"],
+            )
             box_dict = self.convert_valid_bboxes(pred_dicts, info)
             anno = {
-                'name': [],
-                'truncated': [],
-                'occluded': [],
-                'alpha': [],
-                'bbox': [],
-                'dimensions': [],
-                'location': [],
-                'rotation_y': [],
-                'score': []
+                "name": [],
+                "truncated": [],
+                "occluded": [],
+                "alpha": [],
+                "bbox": [],
+                "dimensions": [],
+                "location": [],
+                "rotation_y": [],
+                "score": [],
             }
-            if len(box_dict['bbox']) > 0:
-                box_2d_preds = box_dict['bbox']
-                box_preds = box_dict['box3d_camera']
-                scores = box_dict['scores']
-                box_preds_lidar = box_dict['box3d_lidar']
-                label_preds = box_dict['label_preds']
-                pred_box_type_3d = box_dict['pred_box_type_3d']
+            if len(box_dict["bbox"]) > 0:
+                box_2d_preds = box_dict["bbox"]
+                box_preds = box_dict["box3d_camera"]
+                scores = box_dict["scores"]
+                box_preds_lidar = box_dict["box3d_lidar"]
+                label_preds = box_dict["label_preds"]
+                pred_box_type_3d = box_dict["pred_box_type_3d"]
 
                 for box, box_lidar, bbox, score, label in zip(
-                        box_preds, box_preds_lidar, box_2d_preds, scores,
-                        label_preds):
+                    box_preds, box_preds_lidar, box_2d_preds, scores, label_preds
+                ):
                     bbox[2:] = np.minimum(bbox[2:], image_shape[::-1])
                     bbox[:2] = np.maximum(bbox[:2], [0, 0])
-                    anno['name'].append(class_names[int(label)])
-                    anno['truncated'].append(0.0)
-                    anno['occluded'].append(0)
+                    anno["name"].append(class_names[int(label)])
+                    anno["truncated"].append(0.0)
+                    anno["occluded"].append(0)
                     if pred_box_type_3d == CameraInstance3DBoxes:
-                        anno['alpha'].append(-np.arctan2(box[0], box[2]) +
-                                             box[6])
+                        anno["alpha"].append(-np.arctan2(box[0], box[2]) + box[6])
                     elif pred_box_type_3d == LiDARInstance3DBoxes:
-                        anno['alpha'].append(
-                            -np.arctan2(-box_lidar[1], box_lidar[0]) + box[6])
-                    anno['bbox'].append(bbox)
-                    anno['dimensions'].append(box[3:6])
-                    anno['location'].append(box[:3])
-                    anno['rotation_y'].append(box[6])
-                    anno['score'].append(score)
+                        anno["alpha"].append(
+                            -np.arctan2(-box_lidar[1], box_lidar[0]) + box[6]
+                        )
+                    anno["bbox"].append(bbox)
+                    anno["dimensions"].append(box[3:6])
+                    anno["location"].append(box[:3])
+                    anno["rotation_y"].append(box[6])
+                    anno["score"].append(score)
 
                 anno = {k: np.stack(v) for k, v in anno.items()}
             else:
                 anno = {
-                    'name': np.array([]),
-                    'truncated': np.array([]),
-                    'occluded': np.array([]),
-                    'alpha': np.array([]),
-                    'bbox': np.zeros([0, 4]),
-                    'dimensions': np.zeros([0, 3]),
-                    'location': np.zeros([0, 3]),
-                    'rotation_y': np.array([]),
-                    'score': np.array([]),
+                    "name": np.array([]),
+                    "truncated": np.array([]),
+                    "occluded": np.array([]),
+                    "alpha": np.array([]),
+                    "bbox": np.zeros([0, 4]),
+                    "dimensions": np.zeros([0, 3]),
+                    "location": np.zeros([0, 3]),
+                    "rotation_y": np.array([]),
+                    "score": np.array([]),
                 }
 
             if submission_prefix is not None:
-                curr_file = f'{submission_prefix}/{sample_idx:06d}.txt'
-                with open(curr_file, 'w') as f:
-                    bbox = anno['bbox']
-                    loc = anno['location']
-                    dims = anno['dimensions']  # lhw -> hwl
+                curr_file = f"{submission_prefix}/{sample_idx:06d}.txt"
+                with open(curr_file, "w") as f:
+                    bbox = anno["bbox"]
+                    loc = anno["location"]
+                    dims = anno["dimensions"]  # lhw -> hwl
 
                     for idx in range(len(bbox)):
                         print(
-                            '{} -1 -1 {:.4f} {:.4f} {:.4f} {:.4f} '
-                            '{:.4f} {:.4f} {:.4f} '
-                            '{:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}'.format(
-                                anno['name'][idx], anno['alpha'][idx],
-                                bbox[idx][0], bbox[idx][1], bbox[idx][2],
-                                bbox[idx][3], dims[idx][1], dims[idx][2],
-                                dims[idx][0], loc[idx][0], loc[idx][1],
-                                loc[idx][2], anno['rotation_y'][idx],
-                                anno['score'][idx]),
-                            file=f)
+                            "{} -1 -1 {:.4f} {:.4f} {:.4f} {:.4f} "
+                            "{:.4f} {:.4f} {:.4f} "
+                            "{:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}".format(
+                                anno["name"][idx],
+                                anno["alpha"][idx],
+                                bbox[idx][0],
+                                bbox[idx][1],
+                                bbox[idx][2],
+                                bbox[idx][3],
+                                dims[idx][1],
+                                dims[idx][2],
+                                dims[idx][0],
+                                loc[idx][0],
+                                loc[idx][1],
+                                loc[idx][2],
+                                anno["rotation_y"][idx],
+                                anno["score"][idx],
+                            ),
+                            file=f,
+                        )
 
-            anno['sample_idx'] = np.array(
-                [sample_idx] * len(anno['score']), dtype=np.int64)
+            anno["sample_idx"] = np.array(
+                [sample_idx] * len(anno["score"]), dtype=np.int64
+            )
 
             det_annos.append(anno)
 
         if pklfile_prefix is not None:
-            if not pklfile_prefix.endswith(('.pkl', '.pickle')):
-                out = f'{pklfile_prefix}.pkl'
+            if not pklfile_prefix.endswith((".pkl", ".pickle")):
+                out = f"{pklfile_prefix}.pkl"
             else:
                 out = pklfile_prefix
             mmengine.dump(det_annos, out)
-            print(f'Result is saved to {out}.')
+            print(f"Result is saved to {out}.")
 
         return det_annos
 
     def bbox2result_kitti2d(
-            self,
-            net_outputs: List[dict],
-            sample_idx_list: List[int],
-            class_names: List[str],
-            pklfile_prefix: Optional[str] = None,
-            submission_prefix: Optional[str] = None) -> List[dict]:
+        self,
+        net_outputs: List[dict],
+        sample_idx_list: List[int],
+        class_names: List[str],
+        pklfile_prefix: Optional[str] = None,
+        submission_prefix: Optional[str] = None,
+    ) -> List[dict]:
         """Convert 2D detection results to kitti format for evaluation and test
         submission.
 
@@ -460,12 +491,14 @@ class KittiMetric(BaseMetric):
         Returns:
             List[dict]: A list of dictionaries with the kitti format.
         """
-        assert len(net_outputs) == len(self.data_infos), \
-            'invalid list length of network outputs'
+        assert len(net_outputs) == len(
+            self.data_infos
+        ), "invalid list length of network outputs"
         det_annos = []
-        print('\nConverting 2D prediction to KITTI format')
+        print("\nConverting 2D prediction to KITTI format")
         for i, bboxes_per_sample in enumerate(
-                mmengine.track_iter_progress(net_outputs)):
+            mmengine.track_iter_progress(net_outputs)
+        ):
             anno = dict(
                 name=[],
                 truncated=[],
@@ -475,26 +508,26 @@ class KittiMetric(BaseMetric):
                 dimensions=[],
                 location=[],
                 rotation_y=[],
-                score=[])
+                score=[],
+            )
             sample_idx = sample_idx_list[i]
 
             num_example = 0
-            bbox = bboxes_per_sample['bboxes']
+            bbox = bboxes_per_sample["bboxes"]
             for i in range(bbox.shape[0]):
-                anno['name'].append(class_names[int(
-                    bboxes_per_sample['labels'][i])])
-                anno['truncated'].append(0.0)
-                anno['occluded'].append(0)
-                anno['alpha'].append(0.0)
-                anno['bbox'].append(bbox[i, :4])
+                anno["name"].append(class_names[int(bboxes_per_sample["labels"][i])])
+                anno["truncated"].append(0.0)
+                anno["occluded"].append(0)
+                anno["alpha"].append(0.0)
+                anno["bbox"].append(bbox[i, :4])
                 # set dimensions (height, width, length) to zero
-                anno['dimensions'].append(
-                    np.zeros(shape=[3], dtype=np.float32))
+                anno["dimensions"].append(np.zeros(shape=[3], dtype=np.float32))
                 # set the 3D translation to (-1000, -1000, -1000)
-                anno['location'].append(
-                    np.ones(shape=[3], dtype=np.float32) * (-1000.0))
-                anno['rotation_y'].append(0.0)
-                anno['score'].append(bboxes_per_sample['scores'][i])
+                anno["location"].append(
+                    np.ones(shape=[3], dtype=np.float32) * (-1000.0)
+                )
+                anno["rotation_y"].append(0.0)
+                anno["score"].append(bboxes_per_sample["scores"][i])
                 num_example += 1
 
             if num_example == 0:
@@ -512,43 +545,43 @@ class KittiMetric(BaseMetric):
             else:
                 anno = {k: np.stack(v) for k, v in anno.items()}
 
-            anno['sample_idx'] = np.array(
-                [sample_idx] * num_example, dtype=np.int64)
+            anno["sample_idx"] = np.array([sample_idx] * num_example, dtype=np.int64)
             det_annos.append(anno)
 
         if pklfile_prefix is not None:
-            if not pklfile_prefix.endswith(('.pkl', '.pickle')):
-                out = f'{pklfile_prefix}.pkl'
+            if not pklfile_prefix.endswith((".pkl", ".pickle")):
+                out = f"{pklfile_prefix}.pkl"
             else:
                 out = pklfile_prefix
             mmengine.dump(det_annos, out)
-            print(f'Result is saved to {out}.')
+            print(f"Result is saved to {out}.")
 
         if submission_prefix is not None:
             # save file in submission format
             mmengine.mkdir_or_exist(submission_prefix)
-            print(f'Saving KITTI submission to {submission_prefix}')
+            print(f"Saving KITTI submission to {submission_prefix}")
             for i, anno in enumerate(det_annos):
                 sample_idx = sample_idx_list[i]
-                cur_det_file = f'{submission_prefix}/{sample_idx:06d}.txt'
-                with open(cur_det_file, 'w') as f:
-                    bbox = anno['bbox']
-                    loc = anno['location']
-                    dims = anno['dimensions'][::-1]  # lhw -> hwl
+                cur_det_file = f"{submission_prefix}/{sample_idx:06d}.txt"
+                with open(cur_det_file, "w") as f:
+                    bbox = anno["bbox"]
+                    loc = anno["location"]
+                    dims = anno["dimensions"][::-1]  # lhw -> hwl
                     for idx in range(len(bbox)):
                         print(
-                            '{} -1 -1 {:4f} {:4f} {:4f} {:4f} {:4f} {:4f} '
-                            '{:4f} {:4f} {:4f} {:4f} {:4f} {:4f} {:4f}'.format(
-                                anno['name'][idx],
-                                anno['alpha'][idx],
+                            "{} -1 -1 {:4f} {:4f} {:4f} {:4f} {:4f} {:4f} "
+                            "{:4f} {:4f} {:4f} {:4f} {:4f} {:4f} {:4f}".format(
+                                anno["name"][idx],
+                                anno["alpha"][idx],
                                 *bbox[idx],  # 4 float
                                 *dims[idx],  # 3 float
                                 *loc[idx],  # 3 float
-                                anno['rotation_y'][idx],
-                                anno['score'][idx]),
+                                anno["rotation_y"][idx],
+                                anno["score"][idx],
+                            ),
                             file=f,
                         )
-            print(f'Result is saved to {submission_prefix}')
+            print(f"Result is saved to {submission_prefix}")
 
         return det_annos
 
@@ -576,10 +609,10 @@ class KittiMetric(BaseMetric):
             - sample_idx (int): Sample index.
         """
         # TODO: refactor this function
-        box_preds = box_dict['bboxes_3d']
-        scores = box_dict['scores_3d']
-        labels = box_dict['labels_3d']
-        sample_idx = info['sample_idx']
+        box_preds = box_dict["bboxes_3d"]
+        scores = box_dict["scores_3d"]
+        labels = box_dict["labels_3d"]
+        sample_idx = info["sample_idx"]
         box_preds.limit_yaw(offset=0.5, period=np.pi * 2)
 
         if len(box_preds) == 0:
@@ -589,16 +622,20 @@ class KittiMetric(BaseMetric):
                 box3d_lidar=np.zeros([0, 7]),
                 scores=np.zeros([0]),
                 label_preds=np.zeros([0, 4]),
-                sample_idx=sample_idx)
+                sample_idx=sample_idx,
+            )
         # Here default used 'CAM2' to compute metric. If you want to
         # use another camera, please modify it.
-        lidar2cam = np.array(
-            info['images'][self.default_cam_key]['lidar2cam']).astype(
-                np.float32)
-        P2 = np.array(info['images'][self.default_cam_key]['cam2img']).astype(
-            np.float32)
-        img_shape = (info['images'][self.default_cam_key]['height'],
-                     info['images'][self.default_cam_key]['width'])
+        lidar2cam = np.array(info["images"][self.default_cam_key]["lidar2cam"]).astype(
+            np.float32
+        )
+        P2 = np.array(info["images"][self.default_cam_key]["cam2img"]).astype(
+            np.float32
+        )
+        img_shape = (
+            info["images"][self.default_cam_key]["height"],
+            info["images"][self.default_cam_key]["width"],
+        )
         P2 = box_preds.tensor.new_tensor(P2)
 
         if isinstance(box_preds, LiDARInstance3DBoxes):
@@ -606,8 +643,9 @@ class KittiMetric(BaseMetric):
             box_preds_lidar = box_preds
         elif isinstance(box_preds, CameraInstance3DBoxes):
             box_preds_camera = box_preds
-            box_preds_lidar = box_preds.convert_to(Box3DMode.LIDAR,
-                                                   np.linalg.inv(lidar2cam))
+            box_preds_lidar = box_preds.convert_to(
+                Box3DMode.LIDAR, np.linalg.inv(lidar2cam)
+            )
 
         box_corners = box_preds_camera.corners
         box_corners_in_image = points_cam2img(box_corners, P2)
@@ -618,14 +656,18 @@ class KittiMetric(BaseMetric):
         # Post-processing
         # check box_preds_camera
         image_shape = box_preds.tensor.new_tensor(img_shape)
-        valid_cam_inds = ((box_2d_preds[:, 0] < image_shape[1]) &
-                          (box_2d_preds[:, 1] < image_shape[0]) &
-                          (box_2d_preds[:, 2] > 0) & (box_2d_preds[:, 3] > 0))
+        valid_cam_inds = (
+            (box_2d_preds[:, 0] < image_shape[1])
+            & (box_2d_preds[:, 1] < image_shape[0])
+            & (box_2d_preds[:, 2] > 0)
+            & (box_2d_preds[:, 3] > 0)
+        )
         # check box_preds_lidar
         if isinstance(box_preds, LiDARInstance3DBoxes):
             limit_range = box_preds.tensor.new_tensor(self.pcd_limit_range)
-            valid_pcd_inds = ((box_preds_lidar.center > limit_range[:3]) &
-                              (box_preds_lidar.center < limit_range[3:]))
+            valid_pcd_inds = (box_preds_lidar.center > limit_range[:3]) & (
+                box_preds_lidar.center < limit_range[3:]
+            )
             valid_inds = valid_cam_inds & valid_pcd_inds.all(-1)
         else:
             valid_inds = valid_cam_inds
@@ -638,7 +680,8 @@ class KittiMetric(BaseMetric):
                 box3d_lidar=box_preds_lidar[valid_inds].numpy(),
                 scores=scores[valid_inds].numpy(),
                 label_preds=labels[valid_inds].numpy(),
-                sample_idx=sample_idx)
+                sample_idx=sample_idx,
+            )
         else:
             return dict(
                 bbox=np.zeros([0, 4]),
@@ -647,4 +690,5 @@ class KittiMetric(BaseMetric):
                 box3d_lidar=np.zeros([0, 7]),
                 scores=np.zeros([0]),
                 label_preds=np.zeros([0]),
-                sample_idx=sample_idx)
+                sample_idx=sample_idx,
+            )

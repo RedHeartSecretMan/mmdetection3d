@@ -2,7 +2,6 @@
 from typing import Optional, Tuple, Union
 
 import numpy as np
-
 from mmdet3d.datasets import PointSample
 from mmdet3d.registry import TRANSFORMS
 from mmdet3d.structures.points import BasePoints
@@ -23,7 +22,7 @@ class TR3DPointSample(PointSample):
         num_samples: Union[int, float],
         sample_range: Optional[float] = None,
         replace: bool = False,
-        return_choices: bool = False
+        return_choices: bool = False,
     ) -> Union[Tuple[BasePoints, np.ndarray], BasePoints]:
         """Points random sampling.
 
@@ -46,11 +45,10 @@ class TR3DPointSample(PointSample):
         """
         if isinstance(num_samples, float):
             assert num_samples < 1
-            num_samples = int(
-                np.random.uniform(self.num_points, 1.) * points.shape[0])
+            num_samples = int(np.random.uniform(self.num_points, 1.0) * points.shape[0])
 
         if not replace:
-            replace = (points.shape[0] < num_samples)
+            replace = points.shape[0] < num_samples
         point_range = range(len(points))
         if sample_range is not None and not replace:
             # Only sampling the near points when len(points) >= num_samples
@@ -59,8 +57,7 @@ class TR3DPointSample(PointSample):
             near_inds = np.where(dist < sample_range)[0]
             # in case there are too many far points
             if len(far_inds) > num_samples:
-                far_inds = np.random.choice(
-                    far_inds, num_samples, replace=False)
+                far_inds = np.random.choice(far_inds, num_samples, replace=False)
             point_range = near_inds
             num_samples -= len(far_inds)
         choices = np.random.choice(point_range, num_samples, replace=replace)

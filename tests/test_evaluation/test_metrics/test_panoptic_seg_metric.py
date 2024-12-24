@@ -3,10 +3,9 @@ import unittest
 
 import numpy as np
 import torch
-from mmengine.structures import BaseDataElement
-
 from mmdet3d.evaluation.metrics import PanopticSegMetric
 from mmdet3d.structures import Det3DDataSample, PointData
+from mmengine.structures import BaseDataElement
 
 
 class TestPanopticSegMetric(unittest.TestCase):
@@ -30,8 +29,7 @@ class TestPanopticSegMetric(unittest.TestCase):
         num_grass = 50
         num_grass_pred = 40  # rest is sky
         semantic_preds.extend([1 for i in range(num_grass_pred)])  # grass
-        semantic_preds.extend([2 for i in range(num_grass - num_grass_pred)
-                               ])  # sky
+        semantic_preds.extend([2 for i in range(num_grass - num_grass_pred)])  # sky
         instance_preds.extend([0 for i in range(num_grass)])
         gt_semantic.extend([1 for i in range(num_grass)])  # grass
         gt_instance.extend([0 for i in range(num_grass)])
@@ -40,8 +38,7 @@ class TestPanopticSegMetric(unittest.TestCase):
         num_sky = 50
         num_sky_pred = 40  # rest is grass
         semantic_preds.extend([2 for i in range(num_sky_pred)])  # sky
-        semantic_preds.extend([1 for i in range(num_sky - num_sky_pred)
-                               ])  # grass
+        semantic_preds.extend([1 for i in range(num_sky - num_sky_pred)])  # grass
         instance_preds.extend([0 for i in range(num_sky)])  # first instance
         gt_semantic.extend([2 for i in range(num_sky)])  # sky
         gt_instance.extend([0 for i in range(num_sky)])  # first instance
@@ -74,12 +71,14 @@ class TestPanopticSegMetric(unittest.TestCase):
         pred_pts_instance_mask = torch.Tensor(instance_preds)
         pred_pts_seg_data = dict(
             pts_semantic_mask=pred_pts_semantic_mask,
-            pts_instance_mask=pred_pts_instance_mask)
+            pts_instance_mask=pred_pts_instance_mask,
+        )
         data_sample = Det3DDataSample()
         data_sample.pred_pts_seg = PointData(**pred_pts_seg_data)
 
         ann_info_data = dict(
-            pts_semantic_mask=gt_semantic, pts_instance_mask=gt_instance)
+            pts_semantic_mask=gt_semantic, pts_instance_mask=gt_instance
+        )
         data_sample.eval_ann_info = ann_info_data
 
         batch_data_samples = [data_sample]
@@ -96,13 +95,13 @@ class TestPanopticSegMetric(unittest.TestCase):
         data_batch = {}
         predictions = self._demo_mm_model_output()
 
-        classes = ['unlabeled', 'person', 'dog', 'grass', 'sky']
+        classes = ["unlabeled", "person", "dog", "grass", "sky"]
         label2cat = {
-            0: 'unlabeled',
-            1: 'person',
-            2: 'dog',
-            3: 'grass',
-            4: 'sky',
+            0: "unlabeled",
+            1: "person",
+            2: "dog",
+            3: "grass",
+            4: "sky",
         }
 
         ignore_index = [0]  # only ignore ignore class
@@ -110,7 +109,8 @@ class TestPanopticSegMetric(unittest.TestCase):
         id_offset = 2**16
 
         dataset_meta = dict(
-            label2cat=label2cat, ignore_index=ignore_index, classes=classes)
+            label2cat=label2cat, ignore_index=ignore_index, classes=classes
+        )
         panoptic_seg_metric = PanopticSegMetric(
             thing_class_inds=[0, 1],
             stuff_class_inds=[2, 3],

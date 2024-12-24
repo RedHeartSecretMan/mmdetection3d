@@ -1,11 +1,9 @@
 import unittest
 
 import torch
-from mmengine import DefaultScope
-
 from mmdet3d.registry import MODELS
-from mmdet3d.testing import (create_detector_inputs, get_detector_cfg,
-                             setup_seed)
+from mmdet3d.testing import create_detector_inputs, get_detector_cfg, setup_seed
+from mmengine import DefaultScope
 
 
 class TestFreeAnchor(unittest.TestCase):
@@ -13,12 +11,13 @@ class TestFreeAnchor(unittest.TestCase):
     def test_freeanchor(self):
         import mmdet3d.models
 
-        assert hasattr(mmdet3d.models.dense_heads, 'FreeAnchor3DHead')
-        DefaultScope.get_instance('test_freeanchor', scope_name='mmdet3d')
+        assert hasattr(mmdet3d.models.dense_heads, "FreeAnchor3DHead")
+        DefaultScope.get_instance("test_freeanchor", scope_name="mmdet3d")
         setup_seed(0)
         freeanchor_cfg = get_detector_cfg(
-            'free_anchor/pointpillars_hv_regnet-1.6gf_fpn_head-free-anchor'
-            '_sbn-all_8xb4-2x_nus-3d.py')
+            "free_anchor/pointpillars_hv_regnet-1.6gf_fpn_head-free-anchor"
+            "_sbn-all_8xb4-2x_nus-3d.py"
+        )
         # decrease channels to reduce cuda memory.
         freeanchor_cfg.pts_voxel_encoder.feat_channels = [1, 1]
         freeanchor_cfg.pts_middle_encoder.in_channels = 1
@@ -30,7 +29,8 @@ class TestFreeAnchor(unittest.TestCase):
         model = MODELS.build(freeanchor_cfg)
         num_gt_instance = 3
         packed_inputs = create_detector_inputs(
-            num_gt_instance=num_gt_instance, gt_bboxes_dim=9)
+            num_gt_instance=num_gt_instance, gt_bboxes_dim=9
+        )
 
         # TODO: Support aug_test
         # aug_data = [
@@ -55,11 +55,11 @@ class TestFreeAnchor(unittest.TestCase):
             with torch.no_grad():
                 data = model.data_preprocessor(packed_inputs, True)
                 torch.cuda.empty_cache()
-                results = model.forward(**data, mode='predict')
+                results = model.forward(**data, mode="predict")
             self.assertEqual(len(results), 1)
-            self.assertIn('bboxes_3d', results[0].pred_instances_3d)
-            self.assertIn('scores_3d', results[0].pred_instances_3d)
-            self.assertIn('labels_3d', results[0].pred_instances_3d)
+            self.assertIn("bboxes_3d", results[0].pred_instances_3d)
+            self.assertIn("scores_3d", results[0].pred_instances_3d)
+            self.assertIn("labels_3d", results[0].pred_instances_3d)
 
             # TODO: Support aug_test
             # batch_inputs, data_samples = model.data_preprocessor(
@@ -74,7 +74,7 @@ class TestFreeAnchor(unittest.TestCase):
             # self.assertIn('scores_3d', aug_results[1].pred_instances_3d)
             # self.assertIn('labels_3d', aug_results[1].pred_instances_3d)
 
-            losses = model.forward(**data, mode='loss')
+            losses = model.forward(**data, mode="loss")
 
-            self.assertGreaterEqual(losses['positive_bag_loss'], 0)
-            self.assertGreaterEqual(losses['negative_bag_loss'], 0)
+            self.assertGreaterEqual(losses["positive_bag_loss"], 0)
+            self.assertGreaterEqual(losses["negative_bag_loss"], 0)

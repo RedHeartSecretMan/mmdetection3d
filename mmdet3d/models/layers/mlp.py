@@ -2,11 +2,10 @@
 from typing import Tuple
 
 from mmcv.cnn import ConvModule
+from mmdet3d.utils import ConfigType, OptMultiConfig
 from mmengine.model import BaseModule
 from torch import Tensor
 from torch import nn as nn
-
-from mmdet3d.utils import ConfigType, OptMultiConfig
 
 
 class MLP(BaseModule):
@@ -29,19 +28,21 @@ class MLP(BaseModule):
             optional): Initialization config dict. Defaults to None.
     """
 
-    def __init__(self,
-                 in_channel: int = 18,
-                 conv_channels: Tuple[int] = (256, 256),
-                 conv_cfg: ConfigType = dict(type='Conv1d'),
-                 norm_cfg: ConfigType = dict(type='BN1d'),
-                 act_cfg: ConfigType = dict(type='ReLU'),
-                 init_cfg: OptMultiConfig = None) -> None:
+    def __init__(
+        self,
+        in_channel: int = 18,
+        conv_channels: Tuple[int] = (256, 256),
+        conv_cfg: ConfigType = dict(type="Conv1d"),
+        norm_cfg: ConfigType = dict(type="BN1d"),
+        act_cfg: ConfigType = dict(type="ReLU"),
+        init_cfg: OptMultiConfig = None,
+    ) -> None:
         super(MLP, self).__init__(init_cfg=init_cfg)
         self.mlp = nn.Sequential()
         prev_channels = in_channel
         for i, conv_channel in enumerate(conv_channels):
             self.mlp.add_module(
-                f'layer{i}',
+                f"layer{i}",
                 ConvModule(
                     prev_channels,
                     conv_channels[i],
@@ -51,7 +52,9 @@ class MLP(BaseModule):
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg,
                     bias=True,
-                    inplace=True))
+                    inplace=True,
+                ),
+            )
             prev_channels = conv_channels[i]
 
     def forward(self, img_features: Tensor) -> Tensor:

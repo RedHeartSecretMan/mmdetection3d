@@ -1,7 +1,6 @@
 # modified from https://github.com/Haiyang-W/DSVT
 import torch
 import torch.nn as nn
-
 from mmdet3d.registry import MODELS
 
 
@@ -17,8 +16,10 @@ class PointPillarsScatter3D(nn.Module):
         self.num_bev_feats_ori = num_bev_feats // self.nz
 
     def forward(self, batch_dict, **kwargs):
-        pillar_features, coords = batch_dict['pillar_features'], batch_dict[
-            'voxel_coords']
+        pillar_features, coords = (
+            batch_dict["pillar_features"],
+            batch_dict["voxel_coords"],
+        )
 
         batch_spatial_features = []
         batch_size = coords[:, 0].max().int().item() + 1
@@ -27,12 +28,16 @@ class PointPillarsScatter3D(nn.Module):
                 self.num_bev_feats_ori,
                 self.nz * self.nx * self.ny,
                 dtype=pillar_features.dtype,
-                device=pillar_features.device)
+                device=pillar_features.device,
+            )
 
             batch_mask = coords[:, 0] == batch_idx
             this_coords = coords[batch_mask, :]
-            indices = this_coords[:, 1] * self.ny * self.nx + \
-                this_coords[:, 2] * self.nx + this_coords[:,  3]
+            indices = (
+                this_coords[:, 1] * self.ny * self.nx
+                + this_coords[:, 2] * self.nx
+                + this_coords[:, 3]
+            )
             indices = indices.type(torch.long)
             pillars = pillar_features[batch_mask, :]
             pillars = pillars.t()
@@ -41,6 +46,7 @@ class PointPillarsScatter3D(nn.Module):
 
         batch_spatial_features = torch.stack(batch_spatial_features, 0)
         batch_spatial_features = batch_spatial_features.view(
-            batch_size, self.num_bev_feats_ori * self.nz, self.ny, self.nx)
-        batch_dict['spatial_features'] = batch_spatial_features
+            batch_size, self.num_bev_feats_ori * self.nz, self.ny, self.nx
+        )
+        batch_dict["spatial_features"] = batch_spatial_features
         return batch_dict

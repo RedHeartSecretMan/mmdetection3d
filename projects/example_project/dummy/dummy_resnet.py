@@ -1,6 +1,5 @@
-from mmdet.models.backbones import ResNet
-
 from mmdet3d.registry import MODELS
+from mmdet.models.backbones import ResNet
 
 
 @MODELS.register_module()
@@ -11,5 +10,5 @@ class DummyResNet(ResNet):
     """
 
     def __init__(self, **kwargs) -> None:
-        print('Hello world!')
+        print("Hello world!")
         super().__init__(**kwargs)

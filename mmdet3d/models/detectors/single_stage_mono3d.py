@@ -1,13 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Tuple
 
-from mmdet.models.detectors.single_stage import SingleStageDetector
-from mmengine.structures import InstanceData
-from torch import Tensor
-
 from mmdet3d.registry import MODELS
 from mmdet3d.structures.det3d_data_sample import SampleList
 from mmdet3d.utils import OptInstanceList
+from mmdet.models.detectors.single_stage import SingleStageDetector
+from mmengine.structures import InstanceData
+from torch import Tensor
 
 
 @MODELS.register_module()
@@ -58,18 +57,14 @@ class SingleStageMono3DDetector(SingleStageDetector):
               (num_instances, 4).
         """
 
-        assert (data_instances_2d is not None) or \
-               (data_instances_3d is not None),\
-               'please pass at least one type of data_samples'
+        assert (data_instances_2d is not None) or (
+            data_instances_3d is not None
+        ), "please pass at least one type of data_samples"
 
         if data_instances_2d is None:
-            data_instances_2d = [
-                InstanceData() for _ in range(len(data_instances_3d))
-            ]
+            data_instances_2d = [InstanceData() for _ in range(len(data_instances_3d))]
         if data_instances_3d is None:
-            data_instances_3d = [
-                InstanceData() for _ in range(len(data_instances_2d))
-            ]
+            data_instances_3d = [InstanceData() for _ in range(len(data_instances_2d))]
 
         for i, data_sample in enumerate(data_samples):
             data_sample.pred_instances_3d = data_instances_3d[i]
@@ -87,7 +82,7 @@ class SingleStageMono3DDetector(SingleStageDetector):
             tuple[Tensor]: Multi-level features that may have
             different resolutions.
         """
-        batch_imgs = batch_inputs_dict['imgs']
+        batch_imgs = batch_inputs_dict["imgs"]
         x = self.backbone(batch_imgs)
         if self.with_neck:
             x = self.neck(x)

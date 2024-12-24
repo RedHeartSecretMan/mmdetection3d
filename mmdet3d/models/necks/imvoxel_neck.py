@@ -1,9 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from mmcv.cnn import ConvModule
+from mmdet3d.registry import MODELS
 from mmengine.model import BaseModule
 from torch import nn
-
-from mmdet3d.registry import MODELS
 
 
 @MODELS.register_module()
@@ -25,9 +24,10 @@ class OutdoorImVoxelNeck(BaseModule):
                 kernel_size=3,
                 stride=(1, 1, 2),
                 padding=1,
-                conv_cfg=dict(type='Conv3d'),
-                norm_cfg=dict(type='BN3d'),
-                act_cfg=dict(type='ReLU', inplace=True)),
+                conv_cfg=dict(type="Conv3d"),
+                norm_cfg=dict(type="BN3d"),
+                act_cfg=dict(type="ReLU", inplace=True),
+            ),
             ResModule(in_channels * 2, in_channels * 2),
             ConvModule(
                 in_channels=in_channels * 2,
@@ -35,18 +35,21 @@ class OutdoorImVoxelNeck(BaseModule):
                 kernel_size=3,
                 stride=(1, 1, 2),
                 padding=1,
-                conv_cfg=dict(type='Conv3d'),
-                norm_cfg=dict(type='BN3d'),
-                act_cfg=dict(type='ReLU', inplace=True)),
+                conv_cfg=dict(type="Conv3d"),
+                norm_cfg=dict(type="BN3d"),
+                act_cfg=dict(type="ReLU", inplace=True),
+            ),
             ResModule(in_channels * 4, in_channels * 4),
             ConvModule(
                 in_channels=in_channels * 4,
                 out_channels=out_channels,
                 kernel_size=3,
                 padding=(1, 1, 0),
-                conv_cfg=dict(type='Conv3d'),
-                norm_cfg=dict(type='BN3d'),
-                act_cfg=dict(type='ReLU', inplace=True)))
+                conv_cfg=dict(type="Conv3d"),
+                norm_cfg=dict(type="BN3d"),
+                act_cfg=dict(type="ReLU", inplace=True),
+            ),
+        )
 
     def forward(self, x):
         """Forward function.
@@ -83,15 +86,17 @@ class IndoorImVoxelNeck(BaseModule):
         n_channels = in_channels
         for i in range(len(n_blocks)):
             stride = 1 if i == 0 else 2
-            self.__setattr__(f'down_layer_{i}',
-                             self._make_layer(stride, n_channels, n_blocks[i]))
+            self.__setattr__(
+                f"down_layer_{i}", self._make_layer(stride, n_channels, n_blocks[i])
+            )
             n_channels = n_channels * stride
             if i > 0:
                 self.__setattr__(
-                    f'up_block_{i}',
-                    self._make_up_block(n_channels, n_channels // 2))
-            self.__setattr__(f'out_block_{i}',
-                             self._make_block(n_channels, out_channels))
+                    f"up_block_{i}", self._make_up_block(n_channels, n_channels // 2)
+                )
+            self.__setattr__(
+                f"out_block_{i}", self._make_block(n_channels, out_channels)
+            )
 
     def forward(self, x):
         """Forward function.
@@ -104,14 +109,14 @@ class IndoorImVoxelNeck(BaseModule):
         """
         down_outs = []
         for i in range(self.n_scales):
-            x = self.__getattr__(f'down_layer_{i}')(x)
+            x = self.__getattr__(f"down_layer_{i}")(x)
             down_outs.append(x)
         outs = []
         for i in range(self.n_scales - 1, -1, -1):
             if i < self.n_scales - 1:
-                x = self.__getattr__(f'up_block_{i + 1}')(x)
+                x = self.__getattr__(f"up_block_{i + 1}")(x)
                 x = down_outs[i] + x
-            out = self.__getattr__(f'out_block_{i}')(x)
+            out = self.__getattr__(f"out_block_{i}")(x)
             outs.append(out)
         return outs[::-1]
 
@@ -149,7 +154,9 @@ class IndoorImVoxelNeck(BaseModule):
         """
         return nn.Sequential(
             nn.Conv3d(in_channels, out_channels, 3, 1, 1, bias=False),
-            nn.BatchNorm3d(out_channels), nn.ReLU(inplace=True))
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
     @staticmethod
     def _make_up_block(in_channels, out_channels):
@@ -165,9 +172,12 @@ class IndoorImVoxelNeck(BaseModule):
 
         return nn.Sequential(
             nn.ConvTranspose3d(in_channels, out_channels, 2, 2, bias=False),
-            nn.BatchNorm3d(out_channels), nn.ReLU(inplace=True),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
             nn.Conv3d(out_channels, out_channels, 3, 1, 1, bias=False),
-            nn.BatchNorm3d(out_channels), nn.ReLU(inplace=True))
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
 
 class ResModule(nn.Module):
@@ -187,17 +197,19 @@ class ResModule(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=1,
-            conv_cfg=dict(type='Conv3d'),
-            norm_cfg=dict(type='BN3d'),
-            act_cfg=dict(type='ReLU', inplace=True))
+            conv_cfg=dict(type="Conv3d"),
+            norm_cfg=dict(type="BN3d"),
+            act_cfg=dict(type="ReLU", inplace=True),
+        )
         self.conv1 = ConvModule(
             in_channels=out_channels,
             out_channels=out_channels,
             kernel_size=3,
             padding=1,
-            conv_cfg=dict(type='Conv3d'),
-            norm_cfg=dict(type='BN3d'),
-            act_cfg=None)
+            conv_cfg=dict(type="Conv3d"),
+            norm_cfg=dict(type="BN3d"),
+            act_cfg=None,
+        )
         if stride != 1:
             self.downsample = ConvModule(
                 in_channels=in_channels,
@@ -205,9 +217,10 @@ class ResModule(nn.Module):
                 kernel_size=1,
                 stride=stride,
                 padding=0,
-                conv_cfg=dict(type='Conv3d'),
-                norm_cfg=dict(type='BN3d'),
-                act_cfg=None)
+                conv_cfg=dict(type="Conv3d"),
+                norm_cfg=dict(type="BN3d"),
+                act_cfg=None,
+            )
         self.stride = stride
         self.activation = nn.ReLU(inplace=True)
 

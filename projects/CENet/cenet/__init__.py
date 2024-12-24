@@ -6,6 +6,9 @@ from .range_image_segmentor import RangeImageSegmentor
 from .transforms_3d import SemkittiRangeView
 
 __all__ = [
-    'CENet', 'RangeImageHead', 'RangeImageSegmentor', 'SemkittiRangeView',
-    'BoundaryLoss'
+    "CENet",
+    "RangeImageHead",
+    "RangeImageSegmentor",
+    "SemkittiRangeView",
+    "BoundaryLoss",
 ]

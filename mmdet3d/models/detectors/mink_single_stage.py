@@ -14,6 +14,7 @@ except ImportError:
 
 from mmdet3d.registry import MODELS
 from mmdet3d.utils import ConfigType, OptConfigType, OptMultiConfig
+
 from .single_stage import SingleStage3DDetector
 
 
@@ -39,16 +40,19 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
         init_cfg (dict or ConfigDict, optional): the config to control the
             initialization. Defaults to None.
     """
+
     _version = 2
 
-    def __init__(self,
-                 backbone: ConfigType,
-                 neck: OptConfigType = None,
-                 bbox_head: OptConfigType = None,
-                 train_cfg: OptConfigType = None,
-                 test_cfg: OptConfigType = None,
-                 data_preprocessor: OptConfigType = None,
-                 init_cfg: OptMultiConfig = None) -> None:
+    def __init__(
+        self,
+        backbone: ConfigType,
+        neck: OptConfigType = None,
+        bbox_head: OptConfigType = None,
+        train_cfg: OptConfigType = None,
+        test_cfg: OptConfigType = None,
+        data_preprocessor: OptConfigType = None,
+        init_cfg: OptMultiConfig = None,
+    ) -> None:
         super().__init__(
             backbone=backbone,
             neck=neck,
@@ -56,11 +60,13 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
             train_cfg=train_cfg,
             test_cfg=test_cfg,
             data_preprocessor=data_preprocessor,
-            init_cfg=init_cfg)
+            init_cfg=init_cfg,
+        )
         if ME is None:
             raise ImportError(
-                'Please follow `get_started.md` to install MinkowskiEngine.`')
-        self.voxel_size = bbox_head['voxel_size']
+                "Please follow `get_started.md` to install MinkowskiEngine.`"
+            )
+        self.voxel_size = bbox_head["voxel_size"]
 
     def extract_feat(
         self, batch_inputs_dict: Dict[str, Tensor]
@@ -79,11 +85,12 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
                 and for inside 3D object detection, usually a dict containing
                 features will be obtained.
         """
-        points = batch_inputs_dict['points']
+        points = batch_inputs_dict["points"]
 
         coordinates, features = ME.utils.batch_sparse_collate(
             [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
-            device=points[0].device)
+            device=points[0].device,
+        )
         x = ME.SparseTensor(coordinates=coordinates, features=features)
 
         x = self.backbone(x)
@@ -91,11 +98,16 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
             x = self.neck(x)
         return x
 
-    def _load_from_state_dict(self, state_dict: OrderedDict, prefix: str,
-                              local_metadata: Dict, strict: bool,
-                              missing_keys: List[str],
-                              unexpected_keys: List[str],
-                              error_msgs: List[str]) -> None:
+    def _load_from_state_dict(
+        self,
+        state_dict: OrderedDict,
+        prefix: str,
+        local_metadata: Dict,
+        strict: bool,
+        missing_keys: List[str],
+        unexpected_keys: List[str],
+        error_msgs: List[str],
+    ) -> None:
         """Load checkpoint.
 
         Args:
@@ -118,10 +130,11 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
         """
         # The names of some parameters in FCAF3D has been changed
         # since 2022.10.
-        version = local_metadata.get('version', None)
-        if (version is None or
-                version < 2) and self.__class__ is MinkSingleStage3DDetector:
-            convert_dict = {'head.': 'bbox_head.'}
+        version = local_metadata.get("version", None)
+        if (
+            version is None or version < 2
+        ) and self.__class__ is MinkSingleStage3DDetector:
+            convert_dict = {"head.": "bbox_head."}
             state_dict_keys = list(state_dict.keys())
             for k in state_dict_keys:
                 for ori_key, convert_key in convert_dict.items():
@@ -130,7 +143,12 @@ class MinkSingleStage3DDetector(SingleStage3DDetector):
                         state_dict[convert_key] = state_dict[k]
                         del state_dict[k]
 
-        super(MinkSingleStage3DDetector,
-              self)._load_from_state_dict(state_dict, prefix, local_metadata,
-                                          strict, missing_keys,
-                                          unexpected_keys, error_msgs)
+        super(MinkSingleStage3DDetector, self)._load_from_state_dict(
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
+        )

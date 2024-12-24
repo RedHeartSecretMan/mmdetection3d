@@ -3,31 +3,40 @@ from typing import List, Tuple
 
 import torch
 from mmcv.cnn import Scale
+from mmdet3d.registry import MODELS, TASK_UTILS
+
+# from mmdet3d.structures.bbox_3d.utils import rotation_3d_in_axis
+from mmdet3d.structures.det3d_data_sample import SampleList
+from mmdet3d.utils.typing_utils import (
+    ConfigType,
+    InstanceList,
+    OptConfigType,
+    OptInstanceList,
+)
+
 # from mmcv.ops import nms3d, nms3d_normal
 from mmdet.models.utils import multi_apply
 from mmdet.utils import reduce_mean
+
 # from mmengine.config import ConfigDict
 from mmengine.model import BaseModule, bias_init_with_prob, normal_init
 from mmengine.structures import InstanceData
 from torch import Tensor, nn
-
-from mmdet3d.registry import MODELS, TASK_UTILS
-# from mmdet3d.structures.bbox_3d.utils import rotation_3d_in_axis
-from mmdet3d.structures.det3d_data_sample import SampleList
-from mmdet3d.utils.typing_utils import (ConfigType, InstanceList,
-                                        OptConfigType, OptInstanceList)
 
 
 @torch.no_grad()
 def get_points(n_voxels, voxel_size, origin):
     # origin: point-cloud center.
     points = torch.stack(
-        torch.meshgrid([
-            torch.arange(n_voxels[0]),  # 40 W width, x
-            torch.arange(n_voxels[1]),  # 40 D depth, y
-            torch.arange(n_voxels[2])  # 16 H Height, z
-        ]))
-    new_origin = origin - n_voxels / 2. * voxel_size
+        torch.meshgrid(
+            [
+                torch.arange(n_voxels[0]),  # 40 W width, x
+                torch.arange(n_voxels[1]),  # 40 D depth, y
+                torch.arange(n_voxels[2]),  # 16 H Height, z
+            ]
+        )
+    )
+    new_origin = origin - n_voxels / 2.0 * voxel_size
     points = points * voxel_size.view(3, 1, 1, 1) + new_origin.view(3, 1, 1, 1)
     return points
 
@@ -58,21 +67,22 @@ class NerfDetHead(BaseModule):
             Defaults to None.
     """
 
-    def __init__(self,
-                 n_classes: int,
-                 n_levels: int,
-                 n_channels: int,
-                 n_reg_outs: int,
-                 pts_assign_threshold: int,
-                 pts_center_threshold: int,
-                 prior_generator: ConfigType,
-                 center_loss: ConfigType = dict(
-                     type='mmdet.CrossEntropyLoss', use_sigmoid=True),
-                 bbox_loss: ConfigType = dict(type='RotatedIoU3DLoss'),
-                 cls_loss: ConfigType = dict(type='mmdet.FocalLoss'),
-                 train_cfg: OptConfigType = None,
-                 test_cfg: OptConfigType = None,
-                 init_cfg: OptConfigType = None):
+    def __init__(
+        self,
+        n_classes: int,
+        n_levels: int,
+        n_channels: int,
+        n_reg_outs: int,
+        pts_assign_threshold: int,
+        pts_center_threshold: int,
+        prior_generator: ConfigType,
+        center_loss: ConfigType = dict(type="mmdet.CrossEntropyLoss", use_sigmoid=True),
+        bbox_loss: ConfigType = dict(type="RotatedIoU3DLoss"),
+        cls_loss: ConfigType = dict(type="mmdet.FocalLoss"),
+        train_cfg: OptConfigType = None,
+        test_cfg: OptConfigType = None,
+        init_cfg: OptConfigType = None,
+    ):
         super(NerfDetHead, self).__init__(init_cfg)
         self.n_classes = n_classes
         self.n_levels = n_levels
@@ -90,16 +100,15 @@ class NerfDetHead(BaseModule):
     def _init_layers(self, n_channels, n_reg_outs, n_classes, n_levels):
         """Initialize neural network layers of the head."""
         self.conv_center = nn.Conv3d(n_channels, 1, 3, padding=1, bias=False)
-        self.conv_reg = nn.Conv3d(
-            n_channels, n_reg_outs, 3, padding=1, bias=False)
+        self.conv_reg = nn.Conv3d(n_channels, n_reg_outs, 3, padding=1, bias=False)
         self.conv_cls = nn.Conv3d(n_channels, n_classes, 3, padding=1)
-        self.scales = nn.ModuleList([Scale(1.) for _ in range(n_levels)])
+        self.scales = nn.ModuleList([Scale(1.0) for _ in range(n_levels)])
 
     def init_weights(self):
         """Initialize all layer weights."""
-        normal_init(self.conv_center, std=.01)
-        normal_init(self.conv_reg, std=.01)
-        normal_init(self.conv_cls, std=.01, bias=bias_init_with_prob(.01))
+        normal_init(self.conv_center, std=0.01)
+        normal_init(self.conv_reg, std=0.01)
+        normal_init(self.conv_cls, std=0.01, bias=bias_init_with_prob(0.01))
 
     def _forward_single(self, x: Tensor, scale: Scale):
         """Forward pass per level.
@@ -111,14 +120,16 @@ class NerfDetHead(BaseModule):
         Returns:
             tuple[Tensor]: Centerness, bbox and classification predictions.
         """
-        return (self.conv_center(x), torch.exp(scale(self.conv_reg(x))),
-                self.conv_cls(x))
+        return (
+            self.conv_center(x),
+            torch.exp(scale(self.conv_reg(x))),
+            self.conv_cls(x),
+        )
 
     def forward(self, x):
         return multi_apply(self._forward_single, x, self.scales)
 
-    def loss(self, x: Tuple[Tensor], batch_data_samples: SampleList,
-             **kwargs) -> dict:
+    def loss(self, x: Tuple[Tensor], batch_data_samples: SampleList, **kwargs) -> dict:
         """Perform forward propagation and loss calculation of the detection
         head on the features of the upstream network.
 
@@ -141,23 +152,28 @@ class NerfDetHead(BaseModule):
         for data_sample in batch_data_samples:
             batch_input_metas.append(data_sample.metainfo)
             batch_gt_instances_3d.append(data_sample.gt_instances_3d)
-            batch_gt_instances_ignore.append(
-                data_sample.get('ignored_instances', None))
+            batch_gt_instances_ignore.append(data_sample.get("ignored_instances", None))
 
-        loss_inputs = outs + (valid_pred, batch_gt_instances_3d,
-                              batch_input_metas, batch_gt_instances_ignore)
+        loss_inputs = outs + (
+            valid_pred,
+            batch_gt_instances_3d,
+            batch_input_metas,
+            batch_gt_instances_ignore,
+        )
         losses = self.loss_by_feat(*loss_inputs)
         return losses
 
-    def loss_by_feat(self,
-                     center_preds: List[List[Tensor]],
-                     bbox_preds: List[List[Tensor]],
-                     cls_preds: List[List[Tensor]],
-                     valid_pred: Tensor,
-                     batch_gt_instances_3d: InstanceList,
-                     batch_input_metas: List[dict],
-                     batch_gt_instances_ignore: OptInstanceList = None,
-                     **kwargs) -> dict:
+    def loss_by_feat(
+        self,
+        center_preds: List[List[Tensor]],
+        bbox_preds: List[List[Tensor]],
+        cls_preds: List[List[Tensor]],
+        valid_pred: Tensor,
+        batch_gt_instances_3d: InstanceList,
+        batch_input_metas: List[dict],
+        batch_gt_instances_ignore: OptInstanceList = None,
+        **kwargs
+    ) -> dict:
         """Per scene loss function.
 
         Args:
@@ -194,46 +210,61 @@ class NerfDetHead(BaseModule):
                 valid_preds=[x[i] for x in valid_preds],
                 input_meta=batch_input_metas[i],
                 gt_bboxes=batch_gt_instances_3d[i].bboxes_3d,
-                gt_labels=batch_gt_instances_3d[i].labels_3d)
+                gt_labels=batch_gt_instances_3d[i].labels_3d,
+            )
             center_losses.append(center_loss)
             bbox_losses.append(bbox_loss)
             cls_losses.append(cls_loss)
         return dict(
             center_loss=torch.mean(torch.stack(center_losses)),
             bbox_loss=torch.mean(torch.stack(bbox_losses)),
-            cls_loss=torch.mean(torch.stack(cls_losses)))
+            cls_loss=torch.mean(torch.stack(cls_losses)),
+        )
 
-    def _loss_by_feat_single(self, center_preds, bbox_preds, cls_preds,
-                             valid_preds, input_meta, gt_bboxes, gt_labels):
+    def _loss_by_feat_single(
+        self,
+        center_preds,
+        bbox_preds,
+        cls_preds,
+        valid_preds,
+        input_meta,
+        gt_bboxes,
+        gt_labels,
+    ):
         featmap_sizes = [featmap.size()[-3:] for featmap in center_preds]
         points = self._get_points(
             featmap_sizes=featmap_sizes,
-            origin=input_meta['lidar2img']['origin'],
-            device=gt_bboxes.device)
+            origin=input_meta["lidar2img"]["origin"],
+            device=gt_bboxes.device,
+        )
         center_targets, bbox_targets, cls_targets = self._get_targets(
-            points, gt_bboxes, gt_labels)
+            points, gt_bboxes, gt_labels
+        )
 
         center_preds = torch.cat(
-            [x.permute(1, 2, 3, 0).reshape(-1) for x in center_preds])
-        bbox_preds = torch.cat([
-            x.permute(1, 2, 3, 0).reshape(-1, x.shape[0]) for x in bbox_preds
-        ])
+            [x.permute(1, 2, 3, 0).reshape(-1) for x in center_preds]
+        )
+        bbox_preds = torch.cat(
+            [x.permute(1, 2, 3, 0).reshape(-1, x.shape[0]) for x in bbox_preds]
+        )
         cls_preds = torch.cat(
-            [x.permute(1, 2, 3, 0).reshape(-1, x.shape[0]) for x in cls_preds])
+            [x.permute(1, 2, 3, 0).reshape(-1, x.shape[0]) for x in cls_preds]
+        )
         valid_preds = torch.cat(
-            [x.permute(1, 2, 3, 0).reshape(-1) for x in valid_preds])
+            [x.permute(1, 2, 3, 0).reshape(-1) for x in valid_preds]
+        )
         points = torch.cat(points)
 
         # cls loss
         pos_inds = torch.nonzero(
-            torch.logical_and(cls_targets >= 0, valid_preds)).squeeze(1)
+            torch.logical_and(cls_targets >= 0, valid_preds)
+        ).squeeze(1)
         n_pos = points.new_tensor(len(pos_inds))
-        n_pos = max(reduce_mean(n_pos), 1.)
+        n_pos = max(reduce_mean(n_pos), 1.0)
         if torch.any(valid_preds):
             cls_loss = self.cls_loss(
-                cls_preds[valid_preds],
-                cls_targets[valid_preds],
-                avg_factor=n_pos)
+                cls_preds[valid_preds], cls_targets[valid_preds], avg_factor=n_pos
+            )
         else:
             cls_loss = cls_preds[valid_preds].sum()
 
@@ -245,21 +276,22 @@ class NerfDetHead(BaseModule):
             pos_bbox_targets = bbox_targets[pos_inds]
             pos_points = points[pos_inds]
             center_loss = self.center_loss(
-                pos_center_preds, pos_center_targets, avg_factor=n_pos)
+                pos_center_preds, pos_center_targets, avg_factor=n_pos
+            )
             bbox_loss = self.bbox_loss(
                 self._bbox_pred_to_bbox(pos_points, pos_bbox_preds),
                 pos_bbox_targets,
                 weight=pos_center_targets,
-                avg_factor=pos_center_targets.sum())
+                avg_factor=pos_center_targets.sum(),
+            )
         else:
             center_loss = pos_center_preds.sum()
             bbox_loss = pos_bbox_preds.sum()
         return center_loss, bbox_loss, cls_loss
 
-    def predict(self,
-                x: Tuple[Tensor],
-                batch_data_samples: SampleList,
-                rescale: bool = False) -> InstanceList:
+    def predict(
+        self, x: Tuple[Tensor], batch_data_samples: SampleList, rescale: bool = False
+    ) -> InstanceList:
         """Perform forward propagation of the 3D detection head and predict
         detection results on the features of the upstream network.
 
@@ -295,14 +327,19 @@ class NerfDetHead(BaseModule):
             *outs,
             valid_pred=valid_pred,
             batch_input_metas=batch_input_metas,
-            rescale=rescale)
+            rescale=rescale
+        )
         return predictions
 
-    def predict_by_feat(self, center_preds: List[List[Tensor]],
-                        bbox_preds: List[List[Tensor]],
-                        cls_preds: List[List[Tensor]], valid_pred: Tensor,
-                        batch_input_metas: List[dict],
-                        **kwargs) -> List[InstanceData]:
+    def predict_by_feat(
+        self,
+        center_preds: List[List[Tensor]],
+        bbox_preds: List[List[Tensor]],
+        cls_preds: List[List[Tensor]],
+        valid_pred: Tensor,
+        batch_input_metas: List[dict],
+        **kwargs
+    ) -> List[InstanceData]:
         """Generate boxes for all scenes.
 
         Args:
@@ -327,14 +364,19 @@ class NerfDetHead(BaseModule):
                     bbox_preds=[x[i] for x in bbox_preds],
                     cls_preds=[x[i] for x in cls_preds],
                     valid_preds=[x[i] for x in valid_preds],
-                    input_meta=batch_input_metas[i]))
+                    input_meta=batch_input_metas[i],
+                )
+            )
         return results
 
-    def _predict_by_feat_single(self, center_preds: List[Tensor],
-                                bbox_preds: List[Tensor],
-                                cls_preds: List[Tensor],
-                                valid_preds: List[Tensor],
-                                input_meta: dict) -> InstanceData:
+    def _predict_by_feat_single(
+        self,
+        center_preds: List[Tensor],
+        bbox_preds: List[Tensor],
+        cls_preds: List[Tensor],
+        valid_preds: List[Tensor],
+        input_meta: dict,
+    ) -> InstanceData:
         """Generate boxes for single sample.
 
         Args:
@@ -352,16 +394,16 @@ class NerfDetHead(BaseModule):
         featmap_sizes = [featmap.size()[-3:] for featmap in center_preds]
         points = self._get_points(
             featmap_sizes=featmap_sizes,
-            origin=input_meta['lidar2img']['origin'],
-            device=center_preds[0].device)
+            origin=input_meta["lidar2img"]["origin"],
+            device=center_preds[0].device,
+        )
         mlvl_bboxes, mlvl_scores = [], []
         for center_pred, bbox_pred, cls_pred, valid_pred, point in zip(
-                center_preds, bbox_preds, cls_preds, valid_preds, points):
+            center_preds, bbox_preds, cls_preds, valid_preds, points
+        ):
             center_pred = center_pred.permute(1, 2, 3, 0).reshape(-1, 1)
-            bbox_pred = bbox_pred.permute(1, 2, 3,
-                                          0).reshape(-1, bbox_pred.shape[0])
-            cls_pred = cls_pred.permute(1, 2, 3,
-                                        0).reshape(-1, cls_pred.shape[0])
+            bbox_pred = bbox_pred.permute(1, 2, 3, 0).reshape(-1, bbox_pred.shape[0])
+            cls_pred = cls_pred.permute(1, 2, 3, 0).reshape(-1, cls_pred.shape[0])
             valid_pred = valid_pred.permute(1, 2, 3, 0).reshape(-1, 1)
             scores = cls_pred.sigmoid() * center_pred.sigmoid() * valid_pred
             max_scores, _ = scores.max(dim=1)
@@ -380,8 +422,9 @@ class NerfDetHead(BaseModule):
         scores = torch.cat(mlvl_scores)
         bboxes, scores, labels = self._nms(bboxes, scores, input_meta)
 
-        bboxes = input_meta['box_type_3d'](
-            bboxes, box_dim=6, with_yaw=False, origin=(.5, .5, .5))
+        bboxes = input_meta["box_type_3d"](
+            bboxes, box_dim=6, with_yaw=False, origin=(0.5, 0.5, 0.5)
+        )
 
         results = InstanceData()
         results.bboxes_3d = bboxes
@@ -401,30 +444,39 @@ class NerfDetHead(BaseModule):
             tuple[Tensor]: Upsampled valid masks for all feature levels.
         """
         return [
-            nn.Upsample(size=x.shape[-3:],
-                        mode='trilinear')(valid_pred).round().bool()
+            nn.Upsample(size=x.shape[-3:], mode="trilinear")(valid_pred).round().bool()
             for x in features
         ]
 
     @torch.no_grad()
     def _get_points(self, featmap_sizes, origin, device):
         mlvl_points = []
-        tmp_voxel_size = [.16, .16, .2]
+        tmp_voxel_size = [0.16, 0.16, 0.2]
         for i, featmap_size in enumerate(featmap_sizes):
             mlvl_points.append(
                 get_points(
                     n_voxels=torch.tensor(featmap_size),
                     voxel_size=torch.tensor(tmp_voxel_size) * (2**i),
-                    origin=torch.tensor(origin)).reshape(3, -1).transpose(
-                        0, 1).to(device))
+                    origin=torch.tensor(origin),
+                )
+                .reshape(3, -1)
+                .transpose(0, 1)
+                .to(device)
+            )
         return mlvl_points
 
     def _bbox_pred_to_bbox(self, points, bbox_pred):
-        return torch.stack([
-            points[:, 0] - bbox_pred[:, 0], points[:, 1] - bbox_pred[:, 2],
-            points[:, 2] - bbox_pred[:, 4], points[:, 0] + bbox_pred[:, 1],
-            points[:, 1] + bbox_pred[:, 3], points[:, 2] + bbox_pred[:, 5]
-        ], -1)
+        return torch.stack(
+            [
+                points[:, 0] - bbox_pred[:, 0],
+                points[:, 1] - bbox_pred[:, 2],
+                points[:, 2] - bbox_pred[:, 4],
+                points[:, 0] + bbox_pred[:, 1],
+                points[:, 1] + bbox_pred[:, 3],
+                points[:, 2] + bbox_pred[:, 5],
+            ],
+            -1,
+        )
 
     def _bbox_pred_to_loss(self, points, bbox_preds):
         return self._bbox_pred_to_bbox(points, bbox_preds)
@@ -448,8 +500,7 @@ class NerfDetHead(BaseModule):
         dy_max = boxes[..., 1] + boxes[..., 4] / 2 - points[..., 1]
         dz_min = points[..., 2] - boxes[..., 2] + boxes[..., 5] / 2
         dz_max = boxes[..., 2] + boxes[..., 5] / 2 - points[..., 2]
-        return torch.stack((dx_min, dx_max, dy_min, dy_max, dz_min, dz_max),
-                           dim=-1)
+        return torch.stack((dx_min, dx_max, dy_min, dy_max, dz_min, dz_max), dim=-1)
 
     @staticmethod
     def _get_centerness(face_distances):
@@ -465,9 +516,14 @@ class NerfDetHead(BaseModule):
         x_dims = face_distances[..., [0, 1]]
         y_dims = face_distances[..., [2, 3]]
         z_dims = face_distances[..., [4, 5]]
-        centerness_targets = x_dims.min(dim=-1)[0] / x_dims.max(dim=-1)[0] * \
-            y_dims.min(dim=-1)[0] / y_dims.max(dim=-1)[0] * \
-            z_dims.min(dim=-1)[0] / z_dims.max(dim=-1)[0]
+        centerness_targets = (
+            x_dims.min(dim=-1)[0]
+            / x_dims.max(dim=-1)[0]
+            * y_dims.min(dim=-1)[0]
+            / y_dims.max(dim=-1)[0]
+            * z_dims.min(dim=-1)[0]
+            / z_dims.max(dim=-1)[0]
+        )
         return torch.sqrt(centerness_targets)
 
     @torch.no_grad()
@@ -497,36 +553,42 @@ class NerfDetHead(BaseModule):
         volumes = gt_bboxes.volume.to(points.device)
         volumes = volumes.expand(n_points, n_boxes).contiguous()
         gt_bboxes = torch.cat(
-            (gt_bboxes.gravity_center, gt_bboxes.tensor[:, 3:6]), dim=1)
+            (gt_bboxes.gravity_center, gt_bboxes.tensor[:, 3:6]), dim=1
+        )
         gt_bboxes = gt_bboxes.to(points.device).expand(n_points, n_boxes, 6)
         expanded_points = points.unsqueeze(1).expand(n_points, n_boxes, 3)
         bbox_targets = self._get_face_distances(expanded_points, gt_bboxes)
 
         # condition1: inside a gt bbox
-        inside_gt_bbox_mask = bbox_targets[..., :6].min(
-            -1)[0] > 0  # skip angle
+        inside_gt_bbox_mask = bbox_targets[..., :6].min(-1)[0] > 0  # skip angle
 
         # condition2: positive points per scale >= limit
         # calculate positive points per scale
         n_pos_points_per_scale = []
         for i in range(self.n_levels):
             n_pos_points_per_scale.append(
-                torch.sum(inside_gt_bbox_mask[scales == i], dim=0))
+                torch.sum(inside_gt_bbox_mask[scales == i], dim=0)
+            )
         # find best scale
         n_pos_points_per_scale = torch.stack(n_pos_points_per_scale, dim=0)
         lower_limit_mask = n_pos_points_per_scale < self.pts_assign_threshold
         # fix nondeterministic argmax for torch<1.7
-        extra = torch.arange(self.n_levels, 0, -1).unsqueeze(1).expand(
-            self.n_levels, n_boxes).to(lower_limit_mask.device)
+        extra = (
+            torch.arange(self.n_levels, 0, -1)
+            .unsqueeze(1)
+            .expand(self.n_levels, n_boxes)
+            .to(lower_limit_mask.device)
+        )
         lower_index = torch.argmax(lower_limit_mask.int() * extra, dim=0) - 1
-        lower_index = torch.where(lower_index < 0,
-                                  torch.zeros_like(lower_index), lower_index)
-        all_upper_limit_mask = torch.all(
-            torch.logical_not(lower_limit_mask), dim=0)
+        lower_index = torch.where(
+            lower_index < 0, torch.zeros_like(lower_index), lower_index
+        )
+        all_upper_limit_mask = torch.all(torch.logical_not(lower_limit_mask), dim=0)
         best_scale = torch.where(
             all_upper_limit_mask,
             torch.ones_like(all_upper_limit_mask) * self.n_levels - 1,
-            lower_index)
+            lower_index,
+        )
         # keep only points with best scale
         best_scale = torch.unsqueeze(best_scale, 0).expand(n_points, n_boxes)
         scales = torch.unsqueeze(scales, 1).expand(n_points, n_boxes)
@@ -534,32 +596,38 @@ class NerfDetHead(BaseModule):
 
         # condition3: limit topk locations per box by centerness
         centerness = self._get_centerness(bbox_targets)
-        centerness = torch.where(inside_gt_bbox_mask, centerness,
-                                 torch.ones_like(centerness) * -1)
-        centerness = torch.where(inside_best_scale_mask, centerness,
-                                 torch.ones_like(centerness) * -1)
+        centerness = torch.where(
+            inside_gt_bbox_mask, centerness, torch.ones_like(centerness) * -1
+        )
+        centerness = torch.where(
+            inside_best_scale_mask, centerness, torch.ones_like(centerness) * -1
+        )
         top_centerness = torch.topk(
-            centerness, self.pts_center_threshold + 1, dim=0).values[-1]
+            centerness, self.pts_center_threshold + 1, dim=0
+        ).values[-1]
         inside_top_centerness_mask = centerness > top_centerness.unsqueeze(0)
 
         # if there are still more than one objects for a location,
         # we choose the one with minimal area
-        volumes = torch.where(inside_gt_bbox_mask, volumes,
-                              torch.ones_like(volumes) * float_max)
-        volumes = torch.where(inside_best_scale_mask, volumes,
-                              torch.ones_like(volumes) * float_max)
-        volumes = torch.where(inside_top_centerness_mask, volumes,
-                              torch.ones_like(volumes) * float_max)
+        volumes = torch.where(
+            inside_gt_bbox_mask, volumes, torch.ones_like(volumes) * float_max
+        )
+        volumes = torch.where(
+            inside_best_scale_mask, volumes, torch.ones_like(volumes) * float_max
+        )
+        volumes = torch.where(
+            inside_top_centerness_mask, volumes, torch.ones_like(volumes) * float_max
+        )
         min_area, min_area_inds = volumes.min(dim=1)
 
         labels = gt_labels[min_area_inds]
-        labels = torch.where(min_area == float_max,
-                             torch.ones_like(labels) * -1, labels)
+        labels = torch.where(
+            min_area == float_max, torch.ones_like(labels) * -1, labels
+        )
         bbox_targets = bbox_targets[range(n_points), min_area_inds]
         centerness_targets = self._get_centerness(bbox_targets)
 
-        return centerness_targets, self._bbox_pred_to_bbox(
-            points, bbox_targets), labels
+        return centerness_targets, self._bbox_pred_to_bbox(points, bbox_targets), labels
 
     def _nms(self, bboxes, scores, img_meta):
         scores, labels = scores.max(dim=1)
@@ -567,15 +635,19 @@ class NerfDetHead(BaseModule):
         bboxes = bboxes[ids]
         scores = scores[ids]
         labels = labels[ids]
-        ids = self.aligned_3d_nms(bboxes, scores, labels,
-                                  self.test_cfg.iou_thr)
+        ids = self.aligned_3d_nms(bboxes, scores, labels, self.test_cfg.iou_thr)
         bboxes = bboxes[ids]
         bboxes = torch.stack(
-            ((bboxes[:, 0] + bboxes[:, 3]) / 2.,
-             (bboxes[:, 1] + bboxes[:, 4]) / 2.,
-             (bboxes[:, 2] + bboxes[:, 5]) / 2., bboxes[:, 3] - bboxes[:, 0],
-             bboxes[:, 4] - bboxes[:, 1], bboxes[:, 5] - bboxes[:, 2]),
-            dim=1)
+            (
+                (bboxes[:, 0] + bboxes[:, 3]) / 2.0,
+                (bboxes[:, 1] + bboxes[:, 4]) / 2.0,
+                (bboxes[:, 2] + bboxes[:, 5]) / 2.0,
+                bboxes[:, 3] - bboxes[:, 0],
+                bboxes[:, 4] - bboxes[:, 1],
+                bboxes[:, 5] - bboxes[:, 2],
+            ),
+            dim=1,
+        )
         return bboxes, scores[ids], labels[ids]
 
     @staticmethod
@@ -598,32 +670,35 @@ class NerfDetHead(BaseModule):
         y2 = boxes[:, 4]
         z2 = boxes[:, 5]
         area = (x2 - x1) * (y2 - y1) * (z2 - z1)
-        zero = boxes.new_zeros(1, )
+        zero = boxes.new_zeros(
+            1,
+        )
 
         score_sorted = torch.argsort(scores)
         pick = []
-        while (score_sorted.shape[0] != 0):
+        while score_sorted.shape[0] != 0:
             last = score_sorted.shape[0]
             i = score_sorted[-1]
             pick.append(i)
 
-            xx1 = torch.max(x1[i], x1[score_sorted[:last - 1]])
-            yy1 = torch.max(y1[i], y1[score_sorted[:last - 1]])
-            zz1 = torch.max(z1[i], z1[score_sorted[:last - 1]])
-            xx2 = torch.min(x2[i], x2[score_sorted[:last - 1]])
-            yy2 = torch.min(y2[i], y2[score_sorted[:last - 1]])
-            zz2 = torch.min(z2[i], z2[score_sorted[:last - 1]])
+            xx1 = torch.max(x1[i], x1[score_sorted[: last - 1]])
+            yy1 = torch.max(y1[i], y1[score_sorted[: last - 1]])
+            zz1 = torch.max(z1[i], z1[score_sorted[: last - 1]])
+            xx2 = torch.min(x2[i], x2[score_sorted[: last - 1]])
+            yy2 = torch.min(y2[i], y2[score_sorted[: last - 1]])
+            zz2 = torch.min(z2[i], z2[score_sorted[: last - 1]])
             classes1 = classes[i]
-            classes2 = classes[score_sorted[:last - 1]]
+            classes2 = classes[score_sorted[: last - 1]]
             inter_l = torch.max(zero, xx2 - xx1)
             inter_w = torch.max(zero, yy2 - yy1)
             inter_h = torch.max(zero, zz2 - zz1)
 
             inter = inter_l * inter_w * inter_h
-            iou = inter / (area[i] + area[score_sorted[:last - 1]] - inter)
+            iou = inter / (area[i] + area[score_sorted[: last - 1]] - inter)
             iou = iou * (classes1 == classes2).float()
-            score_sorted = score_sorted[torch.nonzero(
-                iou <= thresh, as_tuple=False).flatten()]
+            score_sorted = score_sorted[
+                torch.nonzero(iou <= thresh, as_tuple=False).flatten()
+            ]
 
         indices = boxes.new_tensor(pick, dtype=torch.long)
         return indices

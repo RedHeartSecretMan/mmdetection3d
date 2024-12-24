@@ -11,9 +11,7 @@ class AllReduce(Function):
 
     @staticmethod
     def forward(ctx, input: Tensor) -> Tensor:
-        input_list = [
-            torch.zeros_like(input) for k in range(dist.get_world_size())
-        ]
+        input_list = [torch.zeros_like(input) for k in range(dist.get_world_size())]
         # Use allgather instead of allreduce in-place operations is unreliable
         dist.all_gather(input_list, input, async_op=False)
         inputs = torch.stack(input_list, dim=0)
@@ -25,7 +23,7 @@ class AllReduce(Function):
         return grad_output
 
 
-@MODELS.register_module('naiveSyncBN1d')
+@MODELS.register_module("naiveSyncBN1d")
 class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     """Synchronized Batch Normalization for 3D Tensors.
 
@@ -58,10 +56,9 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
             Tensor: Has shape (N, C) or (N, C, L), same shape as input.
         """
         using_dist = dist.is_available() and dist.is_initialized()
-        if (not using_dist) or dist.get_world_size() == 1 \
-                or not self.training:
+        if (not using_dist) or dist.get_world_size() == 1 or not self.training:
             return super().forward(input)
-        assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
+        assert input.shape[0] > 0, "SyncBN does not support empty inputs"
         is_two_dim = input.dim() == 2
         if is_two_dim:
             input = input.unsqueeze(2)
@@ -75,8 +72,7 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
-        self.running_mean += self.momentum * (
-            mean.detach() - self.running_mean)
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
         self.running_var += self.momentum * (var.detach() - self.running_var)
 
         invstd = torch.rsqrt(var + self.eps)
@@ -90,7 +86,7 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
         return output
 
 
-@MODELS.register_module('naiveSyncBN2d')
+@MODELS.register_module("naiveSyncBN2d")
 class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
     """Synchronized Batch Normalization for 4D Tensors.
 
@@ -120,15 +116,14 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
         Returns:
             Tensor: Has shape (N, C, H, W), same shape as input.
         """
-        assert input.dtype == torch.float32, \
-            f'input should be in float32 type, got {input.dtype}'
+        assert (
+            input.dtype == torch.float32
+        ), f"input should be in float32 type, got {input.dtype}"
         using_dist = dist.is_available() and dist.is_initialized()
-        if (not using_dist) or \
-                dist.get_world_size() == 1 or \
-                not self.training:
+        if (not using_dist) or dist.get_world_size() == 1 or not self.training:
             return super().forward(input)
 
-        assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
+        assert input.shape[0] > 0, "SyncBN does not support empty inputs"
         C = input.shape[1]
         mean = torch.mean(input, dim=[0, 2, 3])
         meansqr = torch.mean(input * input, dim=[0, 2, 3])
@@ -138,8 +133,7 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
-        self.running_mean += self.momentum * (
-            mean.detach() - self.running_mean)
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
         self.running_var += self.momentum * (var.detach() - self.running_var)
 
         invstd = torch.rsqrt(var + self.eps)

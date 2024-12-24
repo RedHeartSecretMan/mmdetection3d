@@ -7,12 +7,11 @@ import mmengine
 import numpy as np
 from mmcv.transforms import LoadImageFromFile
 from mmcv.transforms.base import BaseTransform
-from mmdet.datasets.transforms import LoadAnnotations
-from mmengine.fileio import get
-
 from mmdet3d.registry import TRANSFORMS
 from mmdet3d.structures.bbox_3d import get_box_type
 from mmdet3d.structures.points import BasePoints, get_points_type
+from mmdet.datasets.transforms import LoadAnnotations
+from mmengine.fileio import get
 
 
 @TRANSFORMS.register_module()
@@ -34,14 +33,16 @@ class LoadMultiViewImageFromFiles(BaseTransform):
             Defaults to True.
     """
 
-    def __init__(self,
-                 to_float32: bool = False,
-                 color_type: str = 'unchanged',
-                 backend_args: Optional[dict] = None,
-                 num_views: int = 5,
-                 num_ref_frames: int = -1,
-                 test_mode: bool = False,
-                 set_default_scale: bool = True) -> None:
+    def __init__(
+        self,
+        to_float32: bool = False,
+        color_type: str = "unchanged",
+        backend_args: Optional[dict] = None,
+        num_views: int = 5,
+        num_ref_frames: int = -1,
+        test_mode: bool = False,
+        set_default_scale: bool = True,
+    ) -> None:
         self.to_float32 = to_float32
         self.color_type = color_type
         self.backend_args = backend_args
@@ -76,51 +77,55 @@ class LoadMultiViewImageFromFiles(BaseTransform):
         if self.num_ref_frames > 0:
             # init choice with the current frame
             init_choice = np.array([0], dtype=np.int64)
-            num_frames = len(results['img_filename']) // self.num_views - 1
+            num_frames = len(results["img_filename"]) // self.num_views - 1
             if num_frames == 0:  # no previous frame, then copy cur frames
-                choices = np.random.choice(
-                    1, self.num_ref_frames, replace=True)
+                choices = np.random.choice(1, self.num_ref_frames, replace=True)
             elif num_frames >= self.num_ref_frames:
                 # NOTE: suppose the info is saved following the order
                 # from latest to earlier frames
                 if self.test_mode:
-                    choices = np.arange(num_frames - self.num_ref_frames,
-                                        num_frames) + 1
+                    choices = (
+                        np.arange(num_frames - self.num_ref_frames, num_frames) + 1
+                    )
                 # NOTE: +1 is for selecting previous frames
                 else:
-                    choices = np.random.choice(
-                        num_frames, self.num_ref_frames, replace=False) + 1
+                    choices = (
+                        np.random.choice(num_frames, self.num_ref_frames, replace=False)
+                        + 1
+                    )
             elif num_frames > 0 and num_frames < self.num_ref_frames:
                 if self.test_mode:
                     base_choices = np.arange(num_frames) + 1
-                    random_choices = np.random.choice(
-                        num_frames,
-                        self.num_ref_frames - num_frames,
-                        replace=True) + 1
+                    random_choices = (
+                        np.random.choice(
+                            num_frames, self.num_ref_frames - num_frames, replace=True
+                        )
+                        + 1
+                    )
                     choices = np.concatenate([base_choices, random_choices])
                 else:
-                    choices = np.random.choice(
-                        num_frames, self.num_ref_frames, replace=True) + 1
+                    choices = (
+                        np.random.choice(num_frames, self.num_ref_frames, replace=True)
+                        + 1
+                    )
             else:
                 raise NotImplementedError
             choices = np.concatenate([init_choice, choices])
             select_filename = []
             for choice in choices:
-                select_filename += results['img_filename'][choice *
-                                                           self.num_views:
-                                                           (choice + 1) *
-                                                           self.num_views]
-            results['img_filename'] = select_filename
-            for key in ['cam2img', 'lidar2cam']:
+                select_filename += results["img_filename"][
+                    choice * self.num_views : (choice + 1) * self.num_views
+                ]
+            results["img_filename"] = select_filename
+            for key in ["cam2img", "lidar2cam"]:
                 if key in results:
                     select_results = []
                     for choice in choices:
-                        select_results += results[key][choice *
-                                                       self.num_views:(choice +
-                                                                       1) *
-                                                       self.num_views]
+                        select_results += results[key][
+                            choice * self.num_views : (choice + 1) * self.num_views
+                        ]
                     results[key] = select_results
-            for key in ['ego2global']:
+            for key in ["ego2global"]:
                 if key in results:
                     select_results = []
                     for choice in choices:
@@ -128,48 +133,48 @@ class LoadMultiViewImageFromFiles(BaseTransform):
                     results[key] = select_results
             # Transform lidar2cam to
             # [cur_lidar]2[prev_img] and [cur_lidar]2[prev_cam]
-            for key in ['lidar2cam']:
+            for key in ["lidar2cam"]:
                 if key in results:
                     # only change matrices of previous frames
                     for choice_idx in range(1, len(choices)):
                         pad_prev_ego2global = np.eye(4)
-                        prev_ego2global = results['ego2global'][choice_idx]
-                        pad_prev_ego2global[:prev_ego2global.
-                                            shape[0], :prev_ego2global.
-                                            shape[1]] = prev_ego2global
+                        prev_ego2global = results["ego2global"][choice_idx]
+                        pad_prev_ego2global[
+                            : prev_ego2global.shape[0], : prev_ego2global.shape[1]
+                        ] = prev_ego2global
                         pad_cur_ego2global = np.eye(4)
-                        cur_ego2global = results['ego2global'][0]
-                        pad_cur_ego2global[:cur_ego2global.
-                                           shape[0], :cur_ego2global.
-                                           shape[1]] = cur_ego2global
+                        cur_ego2global = results["ego2global"][0]
+                        pad_cur_ego2global[
+                            : cur_ego2global.shape[0], : cur_ego2global.shape[1]
+                        ] = cur_ego2global
                         cur2prev = np.linalg.inv(pad_prev_ego2global).dot(
-                            pad_cur_ego2global)
-                        for result_idx in range(choice_idx * self.num_views,
-                                                (choice_idx + 1) *
-                                                self.num_views):
-                            results[key][result_idx] = \
-                                results[key][result_idx].dot(cur2prev)
+                            pad_cur_ego2global
+                        )
+                        for result_idx in range(
+                            choice_idx * self.num_views,
+                            (choice_idx + 1) * self.num_views,
+                        ):
+                            results[key][result_idx] = results[key][result_idx].dot(
+                                cur2prev
+                            )
         # Support multi-view images with different shapes
         # TODO: record the origin shape and padded shape
         filename, cam2img, lidar2cam = [], [], []
-        for _, cam_item in results['images'].items():
-            filename.append(cam_item['img_path'])
-            cam2img.append(cam_item['cam2img'])
-            lidar2cam.append(cam_item['lidar2cam'])
-        results['filename'] = filename
-        results['cam2img'] = cam2img
-        results['lidar2cam'] = lidar2cam
+        for _, cam_item in results["images"].items():
+            filename.append(cam_item["img_path"])
+            cam2img.append(cam_item["cam2img"])
+            lidar2cam.append(cam_item["lidar2cam"])
+        results["filename"] = filename
+        results["cam2img"] = cam2img
+        results["lidar2cam"] = lidar2cam
 
-        results['ori_cam2img'] = copy.deepcopy(results['cam2img'])
+        results["ori_cam2img"] = copy.deepcopy(results["cam2img"])
 
         # img is of shape (h, w, c, num_views)
         # h and w can be different for different views
-        img_bytes = [
-            get(name, backend_args=self.backend_args) for name in filename
-        ]
+        img_bytes = [get(name, backend_args=self.backend_args) for name in filename]
         imgs = [
-            mmcv.imfrombytes(img_byte, flag=self.color_type)
-            for img_byte in img_bytes
+            mmcv.imfrombytes(img_byte, flag=self.color_type) for img_byte in img_bytes
         ]
         # handle the image with different shape
         img_shapes = np.stack([img.shape for img in imgs], axis=0)
@@ -181,40 +186,39 @@ class LoadMultiViewImageFromFiles(BaseTransform):
         else:
             pad_shape = None
         if pad_shape is not None:
-            imgs = [
-                mmcv.impad(img, shape=pad_shape, pad_val=0) for img in imgs
-            ]
+            imgs = [mmcv.impad(img, shape=pad_shape, pad_val=0) for img in imgs]
         img = np.stack(imgs, axis=-1)
         if self.to_float32:
             img = img.astype(np.float32)
 
-        results['filename'] = filename
+        results["filename"] = filename
         # unravel to list, see `DefaultFormatBundle` in formating.py
         # which will transpose each image separately and then stack into array
-        results['img'] = [img[..., i] for i in range(img.shape[-1])]
-        results['img_shape'] = img.shape[:2]
-        results['ori_shape'] = img.shape[:2]
+        results["img"] = [img[..., i] for i in range(img.shape[-1])]
+        results["img_shape"] = img.shape[:2]
+        results["ori_shape"] = img.shape[:2]
         # Set initial values for default meta_keys
-        results['pad_shape'] = img.shape[:2]
+        results["pad_shape"] = img.shape[:2]
         if self.set_default_scale:
-            results['scale_factor'] = 1.0
+            results["scale_factor"] = 1.0
         num_channels = 1 if len(img.shape) < 3 else img.shape[2]
-        results['img_norm_cfg'] = dict(
+        results["img_norm_cfg"] = dict(
             mean=np.zeros(num_channels, dtype=np.float32),
             std=np.ones(num_channels, dtype=np.float32),
-            to_rgb=False)
-        results['num_views'] = self.num_views
-        results['num_ref_frames'] = self.num_ref_frames
+            to_rgb=False,
+        )
+        results["num_views"] = self.num_views
+        results["num_ref_frames"] = self.num_ref_frames
         return results
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        repr_str += f'(to_float32={self.to_float32}, '
+        repr_str += f"(to_float32={self.to_float32}, "
         repr_str += f"color_type='{self.color_type}', "
-        repr_str += f'num_views={self.num_views}, '
-        repr_str += f'num_ref_frames={self.num_ref_frames}, '
-        repr_str += f'test_mode={self.test_mode})'
+        repr_str += f"num_views={self.num_views}, "
+        repr_str += f"num_ref_frames={self.num_ref_frames}, "
+        repr_str += f"test_mode={self.test_mode})"
         return repr_str
 
 
@@ -241,22 +245,24 @@ class LoadImageFromFileMono3D(LoadImageFromFile):
         # for kitti dataset, we load 'CAM2' image.
         # for nuscenes dataset, we load 'CAM_FRONT' image.
 
-        if 'CAM2' in results['images']:
-            filename = results['images']['CAM2']['img_path']
-            results['cam2img'] = results['images']['CAM2']['cam2img']
-        elif len(list(results['images'].keys())) == 1:
-            camera_type = list(results['images'].keys())[0]
-            filename = results['images'][camera_type]['img_path']
-            results['cam2img'] = results['images'][camera_type]['cam2img']
+        if "CAM2" in results["images"]:
+            filename = results["images"]["CAM2"]["img_path"]
+            results["cam2img"] = results["images"]["CAM2"]["cam2img"]
+        elif len(list(results["images"].keys())) == 1:
+            camera_type = list(results["images"].keys())[0]
+            filename = results["images"][camera_type]["img_path"]
+            results["cam2img"] = results["images"][camera_type]["cam2img"]
         else:
             raise NotImplementedError(
-                'Currently we only support load image from kitti and '
-                'nuscenes datasets')
+                "Currently we only support load image from kitti and "
+                "nuscenes datasets"
+            )
 
         try:
             img_bytes = get(filename, backend_args=self.backend_args)
             img = mmcv.imfrombytes(
-                img_bytes, flag=self.color_type, backend=self.imdecode_backend)
+                img_bytes, flag=self.color_type, backend=self.imdecode_backend
+            )
         except Exception as e:
             if self.ignore_empty:
                 return None
@@ -265,9 +271,9 @@ class LoadImageFromFileMono3D(LoadImageFromFile):
         if self.to_float32:
             img = img.astype(np.float32)
 
-        results['img'] = img
-        results['img_shape'] = img.shape[:2]
-        results['ori_shape'] = img.shape[:2]
+        results["img"] = img
+        results["img_shape"] = img.shape[:2]
+        results["ori_shape"] = img.shape[:2]
 
         return results
 
@@ -301,14 +307,14 @@ class LoadImageFromNDArray(LoadImageFromFile):
             dict: The dict contains loaded image and meta information.
         """
 
-        img = results['img']
+        img = results["img"]
         if self.to_float32:
             img = img.astype(np.float32)
 
-        results['img_path'] = None
-        results['img'] = img
-        results['img_shape'] = img.shape[:2]
-        results['ori_shape'] = img.shape[:2]
+        results["img_path"] = None
+        results["img"] = img
+        results["img_shape"] = img.shape[:2]
+        results["ori_shape"] = img.shape[:2]
         return results
 
 
@@ -331,20 +337,23 @@ class LoadPointsFromMultiSweeps(BaseTransform):
             sweeps but select the nearest N frames. Defaults to False.
     """
 
-    def __init__(self,
-                 sweeps_num: int = 10,
-                 load_dim: int = 5,
-                 use_dim: List[int] = [0, 1, 2, 4],
-                 backend_args: Optional[dict] = None,
-                 pad_empty_sweeps: bool = False,
-                 remove_close: bool = False,
-                 test_mode: bool = False) -> None:
+    def __init__(
+        self,
+        sweeps_num: int = 10,
+        load_dim: int = 5,
+        use_dim: List[int] = [0, 1, 2, 4],
+        backend_args: Optional[dict] = None,
+        pad_empty_sweeps: bool = False,
+        remove_close: bool = False,
+        test_mode: bool = False,
+    ) -> None:
         self.load_dim = load_dim
         self.sweeps_num = sweeps_num
         if isinstance(use_dim, int):
             use_dim = list(range(use_dim))
-        assert max(use_dim) < load_dim, \
-            f'Expect all used dimensions < {load_dim}, got {use_dim}'
+        assert (
+            max(use_dim) < load_dim
+        ), f"Expect all used dimensions < {load_dim}, got {use_dim}"
         self.use_dim = use_dim
         self.backend_args = backend_args
         self.pad_empty_sweeps = pad_empty_sweeps
@@ -365,15 +374,15 @@ class LoadPointsFromMultiSweeps(BaseTransform):
             points = np.frombuffer(pts_bytes, dtype=np.float32)
         except ConnectionError:
             mmengine.check_file_exist(pts_filename)
-            if pts_filename.endswith('.npy'):
+            if pts_filename.endswith(".npy"):
                 points = np.load(pts_filename)
             else:
                 points = np.fromfile(pts_filename, dtype=np.float32)
         return points
 
-    def _remove_close(self,
-                      points: Union[np.ndarray, BasePoints],
-                      radius: float = 1.0) -> Union[np.ndarray, BasePoints]:
+    def _remove_close(
+        self, points: Union[np.ndarray, BasePoints], radius: float = 1.0
+    ) -> Union[np.ndarray, BasePoints]:
         """Remove point too close within a certain radius from origin.
 
         Args:
@@ -409,11 +418,11 @@ class LoadPointsFromMultiSweeps(BaseTransform):
                 - points (np.ndarray | :obj:`BasePoints`): Multi-sweep point
                   cloud arrays.
         """
-        points = results['points']
+        points = results["points"]
         points.tensor[:, 4] = 0
         sweep_points_list = [points]
-        ts = results['timestamp']
-        if 'lidar_sweeps' not in results:
+        ts = results["timestamp"]
+        if "lidar_sweeps" not in results:
             if self.pad_empty_sweeps:
                 for i in range(self.sweeps_num):
                     if self.remove_close:
@@ -421,27 +430,24 @@ class LoadPointsFromMultiSweeps(BaseTransform):
                     else:
                         sweep_points_list.append(points)
         else:
-            if len(results['lidar_sweeps']) <= self.sweeps_num:
-                choices = np.arange(len(results['lidar_sweeps']))
+            if len(results["lidar_sweeps"]) <= self.sweeps_num:
+                choices = np.arange(len(results["lidar_sweeps"]))
             elif self.test_mode:
                 choices = np.arange(self.sweeps_num)
             else:
                 choices = np.random.choice(
-                    len(results['lidar_sweeps']),
-                    self.sweeps_num,
-                    replace=False)
+                    len(results["lidar_sweeps"]), self.sweeps_num, replace=False
+                )
             for idx in choices:
-                sweep = results['lidar_sweeps'][idx]
-                points_sweep = self._load_points(
-                    sweep['lidar_points']['lidar_path'])
+                sweep = results["lidar_sweeps"][idx]
+                points_sweep = self._load_points(sweep["lidar_points"]["lidar_path"])
                 points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
                 if self.remove_close:
                     points_sweep = self._remove_close(points_sweep)
                 # bc-breaking: Timestamp has divided 1e6 in pkl infos.
-                sweep_ts = sweep['timestamp']
-                lidar2sensor = np.array(sweep['lidar_points']['lidar2sensor'])
-                points_sweep[:, :
-                             3] = points_sweep[:, :3] @ lidar2sensor[:3, :3]
+                sweep_ts = sweep["timestamp"]
+                lidar2sensor = np.array(sweep["lidar_points"]["lidar2sensor"])
+                points_sweep[:, :3] = points_sweep[:, :3] @ lidar2sensor[:3, :3]
                 points_sweep[:, :3] -= lidar2sensor[:3, 3]
                 points_sweep[:, 4] = ts - sweep_ts
                 points_sweep = points.new_point(points_sweep)
@@ -449,12 +455,12 @@ class LoadPointsFromMultiSweeps(BaseTransform):
 
         points = points.cat(sweep_points_list)
         points = points[:, self.use_dim]
-        results['points'] = points
+        results["points"] = points
         return results
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
-        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
+        return f"{self.__class__.__name__}(sweeps_num={self.sweeps_num})"
 
 
 @TRANSFORMS.register_module()
@@ -486,20 +492,19 @@ class PointSegClassMapping(BaseTransform):
 
                 - pts_semantic_mask (np.ndarray): Mapped semantic masks.
         """
-        assert 'pts_semantic_mask' in results
-        pts_semantic_mask = results['pts_semantic_mask']
+        assert "pts_semantic_mask" in results
+        pts_semantic_mask = results["pts_semantic_mask"]
 
-        assert 'seg_label_mapping' in results
-        label_mapping = results['seg_label_mapping']
+        assert "seg_label_mapping" in results
+        label_mapping = results["seg_label_mapping"]
         converted_pts_sem_mask = label_mapping[pts_semantic_mask]
 
-        results['pts_semantic_mask'] = converted_pts_sem_mask
+        results["pts_semantic_mask"] = converted_pts_sem_mask
 
         # 'eval_ann_info' will be passed to evaluator
-        if 'eval_ann_info' in results:
-            assert 'pts_semantic_mask' in results['eval_ann_info']
-            results['eval_ann_info']['pts_semantic_mask'] = \
-                converted_pts_sem_mask
+        if "eval_ann_info" in results:
+            assert "pts_semantic_mask" in results["eval_ann_info"]
+            results["eval_ann_info"]["pts_semantic_mask"] = converted_pts_sem_mask
 
         return results
 
@@ -532,21 +537,21 @@ class NormalizePointsColor(BaseTransform):
 
                 - points (:obj:`BasePoints`): Points after color normalization.
         """
-        points = input_dict['points']
-        assert points.attribute_dims is not None and \
-               'color' in points.attribute_dims.keys(), \
-               'Expect points have color attribute'
+        points = input_dict["points"]
+        assert (
+            points.attribute_dims is not None
+            and "color" in points.attribute_dims.keys()
+        ), "Expect points have color attribute"
         if self.color_mean is not None:
-            points.color = points.color - \
-                           points.color.new_tensor(self.color_mean)
+            points.color = points.color - points.color.new_tensor(self.color_mean)
         points.color = points.color / 255.0
-        input_dict['points'] = points
+        input_dict["points"] = points
         return input_dict
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        repr_str += f'(color_mean={self.color_mean})'
+        repr_str += f"(color_mean={self.color_mean})"
         return repr_str
 
 
@@ -585,22 +590,25 @@ class LoadPointsFromFile(BaseTransform):
             corresponding backend. Defaults to None.
     """
 
-    def __init__(self,
-                 coord_type: str,
-                 load_dim: int = 6,
-                 use_dim: Union[int, List[int]] = [0, 1, 2],
-                 shift_height: bool = False,
-                 use_color: bool = False,
-                 norm_intensity: bool = False,
-                 norm_elongation: bool = False,
-                 backend_args: Optional[dict] = None) -> None:
+    def __init__(
+        self,
+        coord_type: str,
+        load_dim: int = 6,
+        use_dim: Union[int, List[int]] = [0, 1, 2],
+        shift_height: bool = False,
+        use_color: bool = False,
+        norm_intensity: bool = False,
+        norm_elongation: bool = False,
+        backend_args: Optional[dict] = None,
+    ) -> None:
         self.shift_height = shift_height
         self.use_color = use_color
         if isinstance(use_dim, int):
             use_dim = list(range(use_dim))
-        assert max(use_dim) < load_dim, \
-            f'Expect all used dimensions < {load_dim}, got {use_dim}'
-        assert coord_type in ['CAMERA', 'LIDAR', 'DEPTH']
+        assert (
+            max(use_dim) < load_dim
+        ), f"Expect all used dimensions < {load_dim}, got {use_dim}"
+        assert coord_type in ["CAMERA", "LIDAR", "DEPTH"]
 
         self.coord_type = coord_type
         self.load_dim = load_dim
@@ -623,7 +631,7 @@ class LoadPointsFromFile(BaseTransform):
             points = np.frombuffer(pts_bytes, dtype=np.float32)
         except ConnectionError:
             mmengine.check_file_exist(pts_filename)
-            if pts_filename.endswith('.npy'):
+            if pts_filename.endswith(".npy"):
                 points = np.load(pts_filename)
             else:
                 points = np.fromfile(pts_filename, dtype=np.float32)
@@ -642,17 +650,19 @@ class LoadPointsFromFile(BaseTransform):
 
                 - points (:obj:`BasePoints`): Point clouds data.
         """
-        pts_file_path = results['lidar_points']['lidar_path']
+        pts_file_path = results["lidar_points"]["lidar_path"]
         points = self._load_points(pts_file_path)
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         if self.norm_intensity:
-            assert len(self.use_dim) >= 4, \
-                f'When using intensity norm, expect used dimensions >= 4, got {len(self.use_dim)}'  # noqa: E501
+            assert (
+                len(self.use_dim) >= 4
+            ), f"When using intensity norm, expect used dimensions >= 4, got {len(self.use_dim)}"  # noqa: E501
             points[:, 3] = np.tanh(points[:, 3])
         if self.norm_elongation:
-            assert len(self.use_dim) >= 5, \
-                f'When using elongation norm, expect used dimensions >= 5, got {len(self.use_dim)}'  # noqa: E501
+            assert (
+                len(self.use_dim) >= 5
+            ), f"When using elongation norm, expect used dimensions >= 5, got {len(self.use_dim)}"  # noqa: E501
             points[:, 4] = np.tanh(points[:, 4])
         attribute_dims = None
 
@@ -660,8 +670,8 @@ class LoadPointsFromFile(BaseTransform):
             floor_height = np.percentile(points[:, 2], 0.99)
             height = points[:, 2] - floor_height
             points = np.concatenate(
-                [points[:, :3],
-                 np.expand_dims(height, 1), points[:, 3:]], 1)
+                [points[:, :3], np.expand_dims(height, 1), points[:, 3:]], 1
+            )
             attribute_dims = dict(height=3)
 
         if self.use_color:
@@ -669,29 +679,33 @@ class LoadPointsFromFile(BaseTransform):
             if attribute_dims is None:
                 attribute_dims = dict()
             attribute_dims.update(
-                dict(color=[
-                    points.shape[1] - 3,
-                    points.shape[1] - 2,
-                    points.shape[1] - 1,
-                ]))
+                dict(
+                    color=[
+                        points.shape[1] - 3,
+                        points.shape[1] - 2,
+                        points.shape[1] - 1,
+                    ]
+                )
+            )
 
         points_class = get_points_type(self.coord_type)
         points = points_class(
-            points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
-        results['points'] = points
+            points, points_dim=points.shape[-1], attribute_dims=attribute_dims
+        )
+        results["points"] = points
 
         return results
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
-        repr_str = self.__class__.__name__ + '('
-        repr_str += f'shift_height={self.shift_height}, '
-        repr_str += f'use_color={self.use_color}, '
-        repr_str += f'backend_args={self.backend_args}, '
-        repr_str += f'load_dim={self.load_dim}, '
-        repr_str += f'use_dim={self.use_dim})'
-        repr_str += f'norm_intensity={self.norm_intensity})'
-        repr_str += f'norm_elongation={self.norm_elongation})'
+        repr_str = self.__class__.__name__ + "("
+        repr_str += f"shift_height={self.shift_height}, "
+        repr_str += f"use_color={self.use_color}, "
+        repr_str += f"backend_args={self.backend_args}, "
+        repr_str += f"load_dim={self.load_dim}, "
+        repr_str += f"use_dim={self.use_dim})"
+        repr_str += f"norm_intensity={self.norm_intensity})"
+        repr_str += f"norm_elongation={self.norm_elongation})"
         return repr_str
 
 
@@ -710,12 +724,13 @@ class LoadPointsFromDict(LoadPointsFromFile):
         Returns:
             dict: The processed results.
         """
-        assert 'points' in results
-        points = results['points']
+        assert "points" in results
+        points = results["points"]
 
         if self.norm_intensity:
-            assert len(self.use_dim) >= 4, \
-                f'When using intensity norm, expect used dimensions >= 4, got {len(self.use_dim)}'  # noqa: E501
+            assert (
+                len(self.use_dim) >= 4
+            ), f"When using intensity norm, expect used dimensions >= 4, got {len(self.use_dim)}"  # noqa: E501
             points[:, 3] = np.tanh(points[:, 3])
         attribute_dims = None
 
@@ -723,8 +738,8 @@ class LoadPointsFromDict(LoadPointsFromFile):
             floor_height = np.percentile(points[:, 2], 0.99)
             height = points[:, 2] - floor_height
             points = np.concatenate(
-                [points[:, :3],
-                 np.expand_dims(height, 1), points[:, 3:]], 1)
+                [points[:, :3], np.expand_dims(height, 1), points[:, 3:]], 1
+            )
             attribute_dims = dict(height=3)
 
         if self.use_color:
@@ -732,16 +747,20 @@ class LoadPointsFromDict(LoadPointsFromFile):
             if attribute_dims is None:
                 attribute_dims = dict()
             attribute_dims.update(
-                dict(color=[
-                    points.shape[1] - 3,
-                    points.shape[1] - 2,
-                    points.shape[1] - 1,
-                ]))
+                dict(
+                    color=[
+                        points.shape[1] - 3,
+                        points.shape[1] - 2,
+                        points.shape[1] - 1,
+                    ]
+                )
+            )
 
         points_class = get_points_type(self.coord_type)
         points = points_class(
-            points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
-        results['points'] = points
+            points, points_dim=points.shape[-1], attribute_dims=attribute_dims
+        )
+        results["points"] = points
         return results
 
 
@@ -829,30 +848,33 @@ class LoadAnnotations3D(LoadAnnotations):
             corresponding backend. Defaults to None.
     """
 
-    def __init__(self,
-                 with_bbox_3d: bool = True,
-                 with_label_3d: bool = True,
-                 with_attr_label: bool = False,
-                 with_mask_3d: bool = False,
-                 with_seg_3d: bool = False,
-                 with_bbox: bool = False,
-                 with_label: bool = False,
-                 with_mask: bool = False,
-                 with_seg: bool = False,
-                 with_bbox_depth: bool = False,
-                 with_panoptic_3d: bool = False,
-                 poly2mask: bool = True,
-                 seg_3d_dtype: str = 'np.int64',
-                 seg_offset: int = None,
-                 dataset_type: str = None,
-                 backend_args: Optional[dict] = None) -> None:
+    def __init__(
+        self,
+        with_bbox_3d: bool = True,
+        with_label_3d: bool = True,
+        with_attr_label: bool = False,
+        with_mask_3d: bool = False,
+        with_seg_3d: bool = False,
+        with_bbox: bool = False,
+        with_label: bool = False,
+        with_mask: bool = False,
+        with_seg: bool = False,
+        with_bbox_depth: bool = False,
+        with_panoptic_3d: bool = False,
+        poly2mask: bool = True,
+        seg_3d_dtype: str = "np.int64",
+        seg_offset: int = None,
+        dataset_type: str = None,
+        backend_args: Optional[dict] = None,
+    ) -> None:
         super().__init__(
             with_bbox=with_bbox,
             with_label=with_label,
             with_mask=with_mask,
             with_seg=with_seg,
             poly2mask=poly2mask,
-            backend_args=backend_args)
+            backend_args=backend_args,
+        )
         self.with_bbox_3d = with_bbox_3d
         self.with_bbox_depth = with_bbox_depth
         self.with_label_3d = with_label_3d
@@ -875,7 +897,7 @@ class LoadAnnotations3D(LoadAnnotations):
             dict: The dict containing loaded 3D bounding box annotations.
         """
 
-        results['gt_bboxes_3d'] = results['ann_info']['gt_bboxes_3d']
+        results["gt_bboxes_3d"] = results["ann_info"]["gt_bboxes_3d"]
         return results
 
     def _load_bboxes_depth(self, results: dict) -> dict:
@@ -888,8 +910,8 @@ class LoadAnnotations3D(LoadAnnotations):
             dict: The dict containing loaded 2.5D bounding box annotations.
         """
 
-        results['depths'] = results['ann_info']['depths']
-        results['centers_2d'] = results['ann_info']['centers_2d']
+        results["depths"] = results["ann_info"]["depths"]
+        results["centers_2d"] = results["ann_info"]["centers_2d"]
         return results
 
     def _load_labels_3d(self, results: dict) -> dict:
@@ -902,7 +924,7 @@ class LoadAnnotations3D(LoadAnnotations):
             dict: The dict containing loaded label annotations.
         """
 
-        results['gt_labels_3d'] = results['ann_info']['gt_labels_3d']
+        results["gt_labels_3d"] = results["ann_info"]["gt_labels_3d"]
         return results
 
     def _load_attr_labels(self, results: dict) -> dict:
@@ -914,7 +936,7 @@ class LoadAnnotations3D(LoadAnnotations):
         Returns:
             dict: The dict containing loaded label annotations.
         """
-        results['attr_labels'] = results['ann_info']['attr_labels']
+        results["attr_labels"] = results["ann_info"]["attr_labels"]
         return results
 
     def _load_masks_3d(self, results: dict) -> dict:
@@ -926,21 +948,19 @@ class LoadAnnotations3D(LoadAnnotations):
         Returns:
             dict: The dict containing loaded 3D mask annotations.
         """
-        pts_instance_mask_path = results['pts_instance_mask_path']
+        pts_instance_mask_path = results["pts_instance_mask_path"]
 
         try:
-            mask_bytes = get(
-                pts_instance_mask_path, backend_args=self.backend_args)
+            mask_bytes = get(pts_instance_mask_path, backend_args=self.backend_args)
             pts_instance_mask = np.frombuffer(mask_bytes, dtype=np.int64)
         except ConnectionError:
             mmengine.check_file_exist(pts_instance_mask_path)
-            pts_instance_mask = np.fromfile(
-                pts_instance_mask_path, dtype=np.int64)
+            pts_instance_mask = np.fromfile(pts_instance_mask_path, dtype=np.int64)
 
-        results['pts_instance_mask'] = pts_instance_mask
+        results["pts_instance_mask"] = pts_instance_mask
         # 'eval_ann_info' will be passed to evaluator
-        if 'eval_ann_info' in results:
-            results['eval_ann_info']['pts_instance_mask'] = pts_instance_mask
+        if "eval_ann_info" in results:
+            results["eval_ann_info"]["pts_instance_mask"] = pts_instance_mask
         return results
 
     def _load_semantic_seg_3d(self, results: dict) -> dict:
@@ -952,29 +972,28 @@ class LoadAnnotations3D(LoadAnnotations):
         Returns:
             dict: The dict containing the semantic segmentation annotations.
         """
-        pts_semantic_mask_path = results['pts_semantic_mask_path']
+        pts_semantic_mask_path = results["pts_semantic_mask_path"]
 
         try:
-            mask_bytes = get(
-                pts_semantic_mask_path, backend_args=self.backend_args)
+            mask_bytes = get(pts_semantic_mask_path, backend_args=self.backend_args)
             # add .copy() to fix read-only bug
             pts_semantic_mask = np.frombuffer(
-                mask_bytes, dtype=self.seg_3d_dtype).copy()
+                mask_bytes, dtype=self.seg_3d_dtype
+            ).copy()
         except ConnectionError:
             mmengine.check_file_exist(pts_semantic_mask_path)
-            pts_semantic_mask = np.fromfile(
-                pts_semantic_mask_path, dtype=np.int64)
+            pts_semantic_mask = np.fromfile(pts_semantic_mask_path, dtype=np.int64)
 
-        if self.dataset_type == 'semantickitti':
+        if self.dataset_type == "semantickitti":
             pts_semantic_mask = pts_semantic_mask.astype(np.int64)
             pts_semantic_mask = pts_semantic_mask % self.seg_offset
         # nuScenes loads semantic and panoptic labels from different files.
 
-        results['pts_semantic_mask'] = pts_semantic_mask
+        results["pts_semantic_mask"] = pts_semantic_mask
 
         # 'eval_ann_info' will be passed to evaluator
-        if 'eval_ann_info' in results:
-            results['eval_ann_info']['pts_semantic_mask'] = pts_semantic_mask
+        if "eval_ann_info" in results:
+            results["eval_ann_info"]["pts_semantic_mask"] = pts_semantic_mask
         return results
 
     def _load_panoptic_3d(self, results: dict) -> dict:
@@ -986,35 +1005,34 @@ class LoadAnnotations3D(LoadAnnotations):
         Returns:
             dict: The dict containing the panoptic segmentation annotations.
         """
-        pts_panoptic_mask_path = results['pts_panoptic_mask_path']
+        pts_panoptic_mask_path = results["pts_panoptic_mask_path"]
 
         try:
-            mask_bytes = get(
-                pts_panoptic_mask_path, backend_args=self.backend_args)
+            mask_bytes = get(pts_panoptic_mask_path, backend_args=self.backend_args)
             # add .copy() to fix read-only bug
             pts_panoptic_mask = np.frombuffer(
-                mask_bytes, dtype=self.seg_3d_dtype).copy()
+                mask_bytes, dtype=self.seg_3d_dtype
+            ).copy()
         except ConnectionError:
             mmengine.check_file_exist(pts_panoptic_mask_path)
-            pts_panoptic_mask = np.fromfile(
-                pts_panoptic_mask_path, dtype=np.int64)
+            pts_panoptic_mask = np.fromfile(pts_panoptic_mask_path, dtype=np.int64)
 
-        if self.dataset_type == 'semantickitti':
+        if self.dataset_type == "semantickitti":
             pts_semantic_mask = pts_panoptic_mask.astype(np.int64)
             pts_semantic_mask = pts_semantic_mask % self.seg_offset
-        elif self.dataset_type == 'nuscenes':
+        elif self.dataset_type == "nuscenes":
             pts_semantic_mask = pts_semantic_mask // self.seg_offset
 
-        results['pts_semantic_mask'] = pts_semantic_mask
+        results["pts_semantic_mask"] = pts_semantic_mask
 
         # We can directly take panoptic labels as instance ids.
         pts_instance_mask = pts_panoptic_mask.astype(np.int64)
-        results['pts_instance_mask'] = pts_instance_mask
+        results["pts_instance_mask"] = pts_instance_mask
 
         # 'eval_ann_info' will be passed to evaluator
-        if 'eval_ann_info' in results:
-            results['eval_ann_info']['pts_semantic_mask'] = pts_semantic_mask
-            results['eval_ann_info']['pts_instance_mask'] = pts_instance_mask
+        if "eval_ann_info" in results:
+            results["eval_ann_info"]["pts_semantic_mask"] = pts_semantic_mask
+            results["eval_ann_info"]["pts_instance_mask"] = pts_instance_mask
         return results
 
     def _load_bboxes(self, results: dict) -> None:
@@ -1030,7 +1048,7 @@ class LoadAnnotations3D(LoadAnnotations):
             dict: The dict contains loaded bounding box annotations.
         """
 
-        results['gt_bboxes'] = results['ann_info']['gt_bboxes']
+        results["gt_bboxes"] = results["ann_info"]["gt_bboxes"]
 
     def _load_labels(self, results: dict) -> None:
         """Private function to load label annotations.
@@ -1041,7 +1059,7 @@ class LoadAnnotations3D(LoadAnnotations):
         Returns:
             dict: The dict contains loaded label annotations.
         """
-        results['gt_bboxes_labels'] = results['ann_info']['gt_bboxes_labels']
+        results["gt_bboxes_labels"] = results["ann_info"]["gt_bboxes_labels"]
 
     def transform(self, results: dict) -> dict:
         """Function to load multiple types annotations.
@@ -1072,21 +1090,21 @@ class LoadAnnotations3D(LoadAnnotations):
 
     def __repr__(self) -> str:
         """str: Return a string that describes the module."""
-        indent_str = '    '
-        repr_str = self.__class__.__name__ + '(\n'
-        repr_str += f'{indent_str}with_bbox_3d={self.with_bbox_3d}, '
-        repr_str += f'{indent_str}with_label_3d={self.with_label_3d}, '
-        repr_str += f'{indent_str}with_attr_label={self.with_attr_label}, '
-        repr_str += f'{indent_str}with_mask_3d={self.with_mask_3d}, '
-        repr_str += f'{indent_str}with_seg_3d={self.with_seg_3d}, '
-        repr_str += f'{indent_str}with_panoptic_3d={self.with_panoptic_3d}, '
-        repr_str += f'{indent_str}with_bbox={self.with_bbox}, '
-        repr_str += f'{indent_str}with_label={self.with_label}, '
-        repr_str += f'{indent_str}with_mask={self.with_mask}, '
-        repr_str += f'{indent_str}with_seg={self.with_seg}, '
-        repr_str += f'{indent_str}with_bbox_depth={self.with_bbox_depth}, '
-        repr_str += f'{indent_str}poly2mask={self.poly2mask})'
-        repr_str += f'{indent_str}seg_offset={self.seg_offset})'
+        indent_str = "    "
+        repr_str = self.__class__.__name__ + "(\n"
+        repr_str += f"{indent_str}with_bbox_3d={self.with_bbox_3d}, "
+        repr_str += f"{indent_str}with_label_3d={self.with_label_3d}, "
+        repr_str += f"{indent_str}with_attr_label={self.with_attr_label}, "
+        repr_str += f"{indent_str}with_mask_3d={self.with_mask_3d}, "
+        repr_str += f"{indent_str}with_seg_3d={self.with_seg_3d}, "
+        repr_str += f"{indent_str}with_panoptic_3d={self.with_panoptic_3d}, "
+        repr_str += f"{indent_str}with_bbox={self.with_bbox}, "
+        repr_str += f"{indent_str}with_label={self.with_label}, "
+        repr_str += f"{indent_str}with_mask={self.with_mask}, "
+        repr_str += f"{indent_str}with_seg={self.with_seg}, "
+        repr_str += f"{indent_str}with_bbox_depth={self.with_bbox_depth}, "
+        repr_str += f"{indent_str}poly2mask={self.poly2mask})"
+        repr_str += f"{indent_str}seg_offset={self.seg_offset})"
 
         return repr_str
 
@@ -1103,12 +1121,14 @@ class LidarDet3DInferencerLoader(BaseTransform):
       - box_mode_3d
     """
 
-    def __init__(self, coord_type='LIDAR', **kwargs) -> None:
+    def __init__(self, coord_type="LIDAR", **kwargs) -> None:
         super().__init__()
         self.from_file = TRANSFORMS.build(
-            dict(type='LoadPointsFromFile', coord_type=coord_type, **kwargs))
+            dict(type="LoadPointsFromFile", coord_type=coord_type, **kwargs)
+        )
         self.from_ndarray = TRANSFORMS.build(
-            dict(type='LoadPointsFromDict', coord_type=coord_type, **kwargs))
+            dict(type="LoadPointsFromDict", coord_type=coord_type, **kwargs)
+        )
         self.box_type_3d, self.box_mode_3d = get_box_type(coord_type)
 
     def transform(self, single_input: dict) -> dict:
@@ -1119,28 +1139,31 @@ class LidarDet3DInferencerLoader(BaseTransform):
         Returns:
             dict: The dict contains loaded image and meta information.
         """
-        assert 'points' in single_input, "key 'points' must be in input dict"
-        if isinstance(single_input['points'], str):
+        assert "points" in single_input, "key 'points' must be in input dict"
+        if isinstance(single_input["points"], str):
             inputs = dict(
-                lidar_points=dict(lidar_path=single_input['points']),
+                lidar_points=dict(lidar_path=single_input["points"]),
                 timestamp=1,
                 # for ScanNet demo we need axis_align_matrix
                 axis_align_matrix=np.eye(4),
                 box_type_3d=self.box_type_3d,
-                box_mode_3d=self.box_mode_3d)
-        elif isinstance(single_input['points'], np.ndarray):
+                box_mode_3d=self.box_mode_3d,
+            )
+        elif isinstance(single_input["points"], np.ndarray):
             inputs = dict(
-                points=single_input['points'],
+                points=single_input["points"],
                 timestamp=1,
                 # for ScanNet demo we need axis_align_matrix
                 axis_align_matrix=np.eye(4),
                 box_type_3d=self.box_type_3d,
-                box_mode_3d=self.box_mode_3d)
+                box_mode_3d=self.box_mode_3d,
+            )
         else:
-            raise ValueError('Unsupported input points type: '
-                             f"{type(single_input['points'])}")
+            raise ValueError(
+                "Unsupported input points type: " f"{type(single_input['points'])}"
+            )
 
-        if 'points' in inputs:
+        if "points" in inputs:
             return self.from_ndarray(inputs)
         return self.from_file(inputs)
 
@@ -1161,9 +1184,11 @@ class MonoDet3DInferencerLoader(BaseTransform):
     def __init__(self, **kwargs) -> None:
         super().__init__()
         self.from_file = TRANSFORMS.build(
-            dict(type='LoadImageFromFileMono3D', **kwargs))
+            dict(type="LoadImageFromFileMono3D", **kwargs)
+        )
         self.from_ndarray = TRANSFORMS.build(
-            dict(type='LoadImageFromNDArray', **kwargs))
+            dict(type="LoadImageFromNDArray", **kwargs)
+        )
 
     def transform(self, single_input: dict) -> dict:
         """Transform function to add image meta information.
@@ -1174,27 +1199,31 @@ class MonoDet3DInferencerLoader(BaseTransform):
         Returns:
             dict: The dict contains loaded image and meta information.
         """
-        box_type_3d, box_mode_3d = get_box_type('camera')
+        box_type_3d, box_mode_3d = get_box_type("camera")
 
-        if isinstance(single_input['img'], str):
+        if isinstance(single_input["img"], str):
             inputs = dict(
                 images=dict(
                     CAM_FRONT=dict(
-                        img_path=single_input['img'],
-                        cam2img=single_input['cam2img'])),
+                        img_path=single_input["img"], cam2img=single_input["cam2img"]
+                    )
+                ),
                 box_mode_3d=box_mode_3d,
-                box_type_3d=box_type_3d)
-        elif isinstance(single_input['img'], np.ndarray):
-            inputs = dict(
-                img=single_input['img'],
-                cam2img=single_input['cam2img'],
                 box_type_3d=box_type_3d,
-                box_mode_3d=box_mode_3d)
+            )
+        elif isinstance(single_input["img"], np.ndarray):
+            inputs = dict(
+                img=single_input["img"],
+                cam2img=single_input["cam2img"],
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d,
+            )
         else:
-            raise ValueError('Unsupported input image type: '
-                             f"{type(single_input['img'])}")
+            raise ValueError(
+                "Unsupported input image type: " f"{type(single_input['img'])}"
+            )
 
-        if 'img' in inputs:
+        if "img" in inputs:
             return self.from_ndarray(inputs)
         return self.from_file(inputs)
 
@@ -1218,16 +1247,20 @@ class MultiModalityDet3DInferencerLoader(BaseTransform):
     def __init__(self, load_point_args: dict, load_img_args: dict) -> None:
         super().__init__()
         self.points_from_file = TRANSFORMS.build(
-            dict(type='LoadPointsFromFile', **load_point_args))
+            dict(type="LoadPointsFromFile", **load_point_args)
+        )
         self.points_from_ndarray = TRANSFORMS.build(
-            dict(type='LoadPointsFromDict', **load_point_args))
-        coord_type = load_point_args['coord_type']
+            dict(type="LoadPointsFromDict", **load_point_args)
+        )
+        coord_type = load_point_args["coord_type"]
         self.box_type_3d, self.box_mode_3d = get_box_type(coord_type)
 
         self.imgs_from_file = TRANSFORMS.build(
-            dict(type='LoadImageFromFile', **load_img_args))
+            dict(type="LoadImageFromFile", **load_img_args)
+        )
         self.imgs_from_ndarray = TRANSFORMS.build(
-            dict(type='LoadImageFromNDArray', **load_img_args))
+            dict(type="LoadImageFromNDArray", **load_img_args)
+        )
 
     def transform(self, single_input: dict) -> dict:
         """Transform function to add image meta information.
@@ -1238,59 +1271,65 @@ class MultiModalityDet3DInferencerLoader(BaseTransform):
             dict: The dict contains loaded image, point cloud and meta
             information.
         """
-        assert 'points' in single_input and 'img' in single_input, \
-            "key 'points', 'img' and must be in input dict," \
-            f'but got {single_input}'
-        if isinstance(single_input['points'], str):
+        assert "points" in single_input and "img" in single_input, (
+            "key 'points', 'img' and must be in input dict," f"but got {single_input}"
+        )
+        if isinstance(single_input["points"], str):
             inputs = dict(
-                lidar_points=dict(lidar_path=single_input['points']),
+                lidar_points=dict(lidar_path=single_input["points"]),
                 timestamp=1,
                 # for ScanNet demo we need axis_align_matrix
                 axis_align_matrix=np.eye(4),
                 box_type_3d=self.box_type_3d,
-                box_mode_3d=self.box_mode_3d)
-        elif isinstance(single_input['points'], np.ndarray):
+                box_mode_3d=self.box_mode_3d,
+            )
+        elif isinstance(single_input["points"], np.ndarray):
             inputs = dict(
-                points=single_input['points'],
+                points=single_input["points"],
                 timestamp=1,
                 # for ScanNet demo we need axis_align_matrix
                 axis_align_matrix=np.eye(4),
                 box_type_3d=self.box_type_3d,
-                box_mode_3d=self.box_mode_3d)
+                box_mode_3d=self.box_mode_3d,
+            )
         else:
-            raise ValueError('Unsupported input points type: '
-                             f"{type(single_input['points'])}")
+            raise ValueError(
+                "Unsupported input points type: " f"{type(single_input['points'])}"
+            )
 
-        if 'points' in inputs:
+        if "points" in inputs:
             points_inputs = self.points_from_ndarray(inputs)
         else:
             points_inputs = self.points_from_file(inputs)
 
         multi_modality_inputs = points_inputs
 
-        box_type_3d, box_mode_3d = get_box_type('lidar')
+        box_type_3d, box_mode_3d = get_box_type("lidar")
 
-        if isinstance(single_input['img'], str):
+        if isinstance(single_input["img"], str):
             inputs = dict(
-                img_path=single_input['img'],
-                cam2img=single_input['cam2img'],
-                lidar2img=single_input['lidar2img'],
-                lidar2cam=single_input['lidar2cam'],
+                img_path=single_input["img"],
+                cam2img=single_input["cam2img"],
+                lidar2img=single_input["lidar2img"],
+                lidar2cam=single_input["lidar2cam"],
                 box_mode_3d=box_mode_3d,
-                box_type_3d=box_type_3d)
-        elif isinstance(single_input['img'], np.ndarray):
-            inputs = dict(
-                img=single_input['img'],
-                cam2img=single_input['cam2img'],
-                lidar2img=single_input['lidar2img'],
-                lidar2cam=single_input['lidar2cam'],
                 box_type_3d=box_type_3d,
-                box_mode_3d=box_mode_3d)
+            )
+        elif isinstance(single_input["img"], np.ndarray):
+            inputs = dict(
+                img=single_input["img"],
+                cam2img=single_input["cam2img"],
+                lidar2img=single_input["lidar2img"],
+                lidar2cam=single_input["lidar2cam"],
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d,
+            )
         else:
-            raise ValueError('Unsupported input image type: '
-                             f"{type(single_input['img'])}")
+            raise ValueError(
+                "Unsupported input image type: " f"{type(single_input['img'])}"
+            )
 
-        if isinstance(single_input['img'], np.ndarray):
+        if isinstance(single_input["img"], np.ndarray):
             imgs_inputs = self.imgs_from_ndarray(inputs)
         else:
             imgs_inputs = self.imgs_from_file(inputs)

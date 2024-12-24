@@ -2,10 +2,9 @@
 from typing import List
 
 import torch
-from mmengine.model import BaseTTAModel
-
 from mmdet3d.registry import MODELS
 from mmdet3d.structures.det3d_data_sample import SampleList
+from mmengine.model import BaseTTAModel
 
 
 @MODELS.register_module()

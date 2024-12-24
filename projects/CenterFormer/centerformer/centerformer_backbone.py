@@ -5,14 +5,14 @@ from typing import List, Tuple
 import numpy as np
 import torch
 from mmcv.cnn import build_norm_layer
+from mmdet3d.models.utils import draw_heatmap_gaussian, gaussian_radius
+from mmdet3d.registry import MODELS
+from mmdet3d.structures import center_to_corner_box2d
 from mmdet.models.utils import multi_apply
 from mmengine.logging import print_log
 from mmengine.structures import InstanceData
 from torch import Tensor, nn
 
-from mmdet3d.models.utils import draw_heatmap_gaussian, gaussian_radius
-from mmdet3d.registry import MODELS
-from mmdet3d.structures import center_to_corner_box2d
 from .transformer import DeformableTransformerDecoder
 
 
@@ -42,8 +42,7 @@ class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -59,8 +58,7 @@ class MultiFrameSpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(MultiFrameSpatialAttention, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, curr, prev):
@@ -74,23 +72,24 @@ class MultiFrameSpatialAttention(nn.Module):
 class BaseDecoderRPN(nn.Module):
 
     def __init__(
-            self,
-            layer_nums,  # [2,2,2]
-            ds_num_filters,  # [128,256,64]
-            num_input_features,  # 256
-            transformer_config=None,
-            hm_head_layer=2,
-            corner_head_layer=2,
-            corner=False,
-            assign_label_window_size=1,
-            classes=3,
-            use_gt_training=False,
-            norm_cfg=None,
-            logger=None,
-            init_bias=-2.19,
-            score_threshold=0.1,
-            obj_num=500,
-            **kwargs):
+        self,
+        layer_nums,  # [2,2,2]
+        ds_num_filters,  # [128,256,64]
+        num_input_features,  # 256
+        transformer_config=None,
+        hm_head_layer=2,
+        corner_head_layer=2,
+        corner=False,
+        assign_label_window_size=1,
+        classes=3,
+        use_gt_training=False,
+        norm_cfg=None,
+        logger=None,
+        init_bias=-2.19,
+        score_threshold=0.1,
+        obj_num=500,
+        **kwargs
+    ):
         super(BaseDecoderRPN, self).__init__()
         self._layer_strides = [1, 2, -4]
         self._num_filters = ds_num_filters
@@ -106,7 +105,7 @@ class BaseDecoderRPN(nn.Module):
         self.batch_id = None
 
         if norm_cfg is None:
-            norm_cfg = dict(type='BN', eps=1e-3, momentum=0.01)
+            norm_cfg = dict(type="BN", eps=1e-3, momentum=0.01)
         self._norm_cfg = norm_cfg
 
         assert len(self._layer_strides) == len(self._layer_nums)
@@ -131,13 +130,11 @@ class BaseDecoderRPN(nn.Module):
         self.blocks = nn.ModuleList(blocks)
         self.up = nn.Sequential(
             nn.ConvTranspose2d(
-                self._num_filters[0],
-                self._num_filters[2],
-                2,
-                stride=2,
-                bias=False),
+                self._num_filters[0], self._num_filters[2], 2, stride=2, bias=False
+            ),
             build_norm_layer(self._norm_cfg, self._num_filters[2])[1],
-            nn.ReLU())
+            nn.ReLU(),
+        )
         # heatmap prediction
         hm_head = []
         for i in range(hm_head_layer - 1):
@@ -149,13 +146,14 @@ class BaseDecoderRPN(nn.Module):
                     stride=1,
                     padding=1,
                     bias=True,
-                ))
+                )
+            )
             hm_head.append(build_norm_layer(self._norm_cfg, 64)[1])
             hm_head.append(nn.ReLU())
 
         hm_head.append(
-            nn.Conv2d(
-                64, classes, kernel_size=3, stride=1, padding=1, bias=True))
+            nn.Conv2d(64, classes, kernel_size=3, stride=1, padding=1, bias=True)
+        )
         hm_head[-1].bias.data.fill_(init_bias)
         self.hm_head = nn.Sequential(*hm_head)
 
@@ -170,14 +168,14 @@ class BaseDecoderRPN(nn.Module):
                         stride=1,
                         padding=1,
                         bias=True,
-                    ))
-                self.corner_head.append(
-                    build_norm_layer(self._norm_cfg, 64)[1])
+                    )
+                )
+                self.corner_head.append(build_norm_layer(self._norm_cfg, 64)[1])
                 self.corner_head.append(nn.ReLU())
 
             self.corner_head.append(
-                nn.Conv2d(
-                    64, 1, kernel_size=3, stride=1, padding=1, bias=True))
+                nn.Conv2d(64, 1, kernel_size=3, stride=1, padding=1, bias=True)
+            )
             self.corner_head[-1].bias.data.fill_(init_bias)
             self.corner_head = nn.Sequential(*self.corner_head)
 
@@ -193,14 +191,17 @@ class BaseDecoderRPN(nn.Module):
         else:
             block = [
                 nn.ConvTranspose2d(
-                    inplanes, planes, -stride, stride=-stride, bias=False),
+                    inplanes, planes, -stride, stride=-stride, bias=False
+                ),
                 build_norm_layer(self._norm_cfg, planes)[1],
                 nn.ReLU(),
             ]
 
         for j in range(num_blocks):
             block.append(nn.Conv2d(planes, planes, 3, padding=1, bias=False))
-            block.append(build_norm_layer(self._norm_cfg, planes)[1], )
+            block.append(
+                build_norm_layer(self._norm_cfg, planes)[1],
+            )
             block.append(nn.ReLU())
 
         block.append(ChannelAttention(planes))
@@ -231,29 +232,32 @@ class BaseDecoderRPN(nn.Module):
         for i, k in enumerate(kernel_size):
             neighbor_coords = torch.arange(-(k // 2), (k // 2) + 1)
             neighbor_coords = torch.flatten(
-                torch.stack(
-                    torch.meshgrid([neighbor_coords, neighbor_coords]), dim=0),
+                torch.stack(torch.meshgrid([neighbor_coords, neighbor_coords]), dim=0),
                 1,
             )  # [2, k]
-            neighbor_coords = (neighbor_coords.permute(
-                1,
-                0).contiguous().to(center_pos))  # relative coordinate [k, 2]
-            neighbor_coords = (center_pos[:, :, None, :] // (2**i) +
-                               neighbor_coords[None, None, :, :]
-                               )  # coordinates [B, 500, k, 2]
+            neighbor_coords = (
+                neighbor_coords.permute(1, 0).contiguous().to(center_pos)
+            )  # relative coordinate [k, 2]
+            neighbor_coords = (
+                center_pos[:, :, None, :] // (2**i) + neighbor_coords[None, None, :, :]
+            )  # coordinates [B, 500, k, 2]
             neighbor_coords = torch.clamp(
-                neighbor_coords, min=0,
-                max=H // (2**i) - 1)  # prevent out of bound
-            feat_id = (neighbor_coords[:, :, :, 1] * (W // (2**i)) +
-                       neighbor_coords[:, :, :, 0])  # pixel id [B, 500, k]
+                neighbor_coords, min=0, max=H // (2**i) - 1
+            )  # prevent out of bound
+            feat_id = (
+                neighbor_coords[:, :, :, 1] * (W // (2**i))
+                + neighbor_coords[:, :, :, 0]
+            )  # pixel id [B, 500, k]
             feat_id = feat_id.reshape(batch, -1)  # pixel id [B, 500*k]
             selected_feat = (
-                feats[i].reshape(batch, num_cls, (H * W) // (4**i)).permute(
-                    0, 2, 1).contiguous()[self.batch_id.repeat(1, k**2),
-                                          feat_id])  # B, 500*k, C
+                feats[i]
+                .reshape(batch, num_cls, (H * W) // (4**i))
+                .permute(0, 2, 1)
+                .contiguous()[self.batch_id.repeat(1, k**2), feat_id]
+            )  # B, 500*k, C
             neighbor_feat_list.append(
-                selected_feat.reshape(batch, center_num, -1,
-                                      num_cls))  # B, 500, k, C
+                selected_feat.reshape(batch, center_num, -1, num_cls)
+            )  # B, 500, k, C
             relative_pos_list.append(neighbor_coords * (2**i))  # B, 500, k, 2
 
         neighbor_pos = torch.cat(relative_pos_list, dim=2)  # B, 500, K, 2/3
@@ -282,47 +286,54 @@ class BaseDecoderRPN(nn.Module):
         for i, k in enumerate(kernel_size):
             neighbor_coords = torch.arange(-(k // 2), (k // 2) + 1)
             neighbor_coords = torch.flatten(
-                torch.stack(
-                    torch.meshgrid([neighbor_coords, neighbor_coords]), dim=0),
+                torch.stack(torch.meshgrid([neighbor_coords, neighbor_coords]), dim=0),
                 1,
             )  # [2, k]
-            neighbor_coords = (neighbor_coords.permute(
-                1,
-                0).contiguous().to(center_pos))  # relative coordinate [k, 2]
-            neighbor_coords = (center_pos[:, :, None, :] // (2**i) +
-                               neighbor_coords[None, None, :, :]
-                               )  # coordinates [B, 500, k, 2]
+            neighbor_coords = (
+                neighbor_coords.permute(1, 0).contiguous().to(center_pos)
+            )  # relative coordinate [k, 2]
+            neighbor_coords = (
+                center_pos[:, :, None, :] // (2**i) + neighbor_coords[None, None, :, :]
+            )  # coordinates [B, 500, k, 2]
             neighbor_coords = torch.clamp(
-                neighbor_coords, min=0,
-                max=H // (2**i) - 1)  # prevent out of bound
-            feat_id = (neighbor_coords[:, :, :, 1] * (W // (2**i)) +
-                       neighbor_coords[:, :, :, 0])  # pixel id [B, 500, k]
+                neighbor_coords, min=0, max=H // (2**i) - 1
+            )  # prevent out of bound
+            feat_id = (
+                neighbor_coords[:, :, :, 1] * (W // (2**i))
+                + neighbor_coords[:, :, :, 0]
+            )  # pixel id [B, 500, k]
             feat_id = feat_id.reshape(batch, -1)  # pixel id [B, 500*k]
             selected_feat = (
-                feats[i].reshape(batch, num_cls, (H * W) // (4**i)).permute(
-                    0, 2, 1).contiguous()[self.batch_id.repeat(1, k**2),
-                                          feat_id])  # B, 500*k, C
+                feats[i]
+                .reshape(batch, num_cls, (H * W) // (4**i))
+                .permute(0, 2, 1)
+                .contiguous()[self.batch_id.repeat(1, k**2), feat_id]
+            )  # B, 500*k, C
             neighbor_feat_list.append(
-                selected_feat.reshape(batch, center_num, -1,
-                                      num_cls))  # B, 500, k, C
+                selected_feat.reshape(batch, center_num, -1, num_cls)
+            )  # B, 500, k, C
             relative_pos_list.append(neighbor_coords * (2**i))  # B, 500, k, 2
             timeframe_list.append(
-                torch.full_like(neighbor_coords[:, :, :, 0:1], 0))  # B, 500, k
+                torch.full_like(neighbor_coords[:, :, :, 0:1], 0)
+            )  # B, 500, k
             if i == 0:
                 # add previous frame feature
                 for frame_num in range(feats[-1].shape[1]):
-                    selected_feat = (feats[-1][:, frame_num, :, :, :].reshape(
-                        batch, num_cls, (H * W) // (4**i)).permute(
-                            0, 2,
-                            1).contiguous()[self.batch_id.repeat(1, k**2),
-                                            feat_id])  # B, 500*k, C
+                    selected_feat = (
+                        feats[-1][:, frame_num, :, :, :]
+                        .reshape(batch, num_cls, (H * W) // (4**i))
+                        .permute(0, 2, 1)
+                        .contiguous()[self.batch_id.repeat(1, k**2), feat_id]
+                    )  # B, 500*k, C
                     neighbor_feat_list.append(
-                        selected_feat.reshape(batch, center_num, -1, num_cls))
+                        selected_feat.reshape(batch, center_num, -1, num_cls)
+                    )
                     relative_pos_list.append(neighbor_coords * (2**i))
                     time = timeframe[:, frame_num + 1].to(selected_feat)  # B
                     timeframe_list.append(
-                        time[:, None, None, None] * torch.full_like(
-                            neighbor_coords[:, :, :, 0:1], 1))  # B, 500, k
+                        time[:, None, None, None]
+                        * torch.full_like(neighbor_coords[:, :, :, 0:1], 1)
+                    )  # B, 500, k
 
         neighbor_pos = torch.cat(relative_pos_list, dim=2)  # B, 500, K, 2/3
         neighbor_feats = torch.cat(neighbor_feat_list, dim=2)  # B, 500, K, C
@@ -341,27 +352,29 @@ class DeformableDecoderRPN(BaseDecoderRPN):
     TODO: split this module into backbone、neck and head.
     """
 
-    def __init__(self,
-                 layer_nums,
-                 ds_num_filters,
-                 num_input_features,
-                 tasks=dict(),
-                 transformer_config=None,
-                 hm_head_layer=2,
-                 corner_head_layer=2,
-                 corner=False,
-                 parametric_embedding=False,
-                 assign_label_window_size=1,
-                 classes=3,
-                 use_gt_training=False,
-                 norm_cfg=None,
-                 logger=None,
-                 init_bias=-2.19,
-                 score_threshold=0.1,
-                 obj_num=500,
-                 train_cfg=None,
-                 test_cfg=None,
-                 **kwargs):
+    def __init__(
+        self,
+        layer_nums,
+        ds_num_filters,
+        num_input_features,
+        tasks=dict(),
+        transformer_config=None,
+        hm_head_layer=2,
+        corner_head_layer=2,
+        corner=False,
+        parametric_embedding=False,
+        assign_label_window_size=1,
+        classes=3,
+        use_gt_training=False,
+        norm_cfg=None,
+        logger=None,
+        init_bias=-2.19,
+        score_threshold=0.1,
+        obj_num=500,
+        train_cfg=None,
+        test_cfg=None,
+        **kwargs
+    ):
         super(DeformableDecoderRPN, self).__init__(
             layer_nums,
             ds_num_filters,
@@ -382,7 +395,7 @@ class DeformableDecoderRPN(BaseDecoderRPN):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         self.tasks = tasks
-        self.class_names = [t['class_names'] for t in tasks]
+        self.class_names = [t["class_names"] for t in tasks]
 
         self.transformer_decoder = DeformableTransformerDecoder(
             self._num_filters[-1] * 2,
@@ -392,22 +405,19 @@ class DeformableDecoderRPN(BaseDecoderRPN):
             dim_ffn=transformer_config.dim_ffn,
             dropout=transformer_config.dropout,
             out_attention=transformer_config.out_attn,
-            n_points=transformer_config.get('n_points', 9),
+            n_points=transformer_config.get("n_points", 9),
         )
-        self.pos_embedding_type = transformer_config.get(
-            'pos_embedding_type', 'linear')
-        if self.pos_embedding_type == 'linear':
+        self.pos_embedding_type = transformer_config.get("pos_embedding_type", "linear")
+        if self.pos_embedding_type == "linear":
             self.pos_embedding = nn.Linear(2, self._num_filters[-1] * 2)
         else:
             raise NotImplementedError()
         self.parametric_embedding = parametric_embedding
         if self.parametric_embedding:
-            self.query_embed = nn.Embedding(self.obj_num,
-                                            self._num_filters[-1] * 2)
+            self.query_embed = nn.Embedding(self.obj_num, self._num_filters[-1] * 2)
             nn.init.uniform_(self.query_embed.weight, -1.0, 1.0)
 
-        print_log('Finish RPN_transformer_deformable Initialization',
-                  'current')
+        print_log("Finish RPN_transformer_deformable Initialization", "current")
 
     def _sigmoid(self, x):
         y = torch.clamp(x.sigmoid_(), min=1e-4, max=1 - 1e-4)
@@ -435,32 +445,35 @@ class DeformableDecoderRPN(BaseDecoderRPN):
         hm = self._sigmoid(hm)
         batch, num_cls, H, W = hm.size()
 
-        scores, labels = torch.max(
-            hm.reshape(batch, num_cls, H * W), dim=1)  # b,H*W
-        self.batch_id = torch.from_numpy(np.indices(
-            (batch, self.obj_num))[0]).to(labels)
+        scores, labels = torch.max(hm.reshape(batch, num_cls, H * W), dim=1)  # b,H*W
+        self.batch_id = torch.from_numpy(np.indices((batch, self.obj_num))[0]).to(
+            labels
+        )
 
         if self.training:
-            heatmaps, anno_boxes, gt_inds, gt_masks, corner_heatmaps, cat_labels = self.get_targets(  # noqa: E501
-                batch_gt_instance_3d)
+            heatmaps, anno_boxes, gt_inds, gt_masks, corner_heatmaps, cat_labels = (
+                self.get_targets(batch_gt_instance_3d)  # noqa: E501
+            )
             batch_targets = dict(
                 ind=gt_inds,
                 mask=gt_masks,
                 hm=heatmaps,
                 anno_box=anno_boxes,
                 corners=corner_heatmaps,
-                cat=cat_labels)
-            inds = gt_inds[0][:, (self.window_size // 2)::self.window_size]
-            masks = gt_masks[0][:, (self.window_size // 2)::self.window_size]
-            batch_id_gt = torch.from_numpy(
-                np.indices((batch, inds.shape[1]))[0]).to(labels)
+                cat=cat_labels,
+            )
+            inds = gt_inds[0][:, (self.window_size // 2) :: self.window_size]
+            masks = gt_masks[0][:, (self.window_size // 2) :: self.window_size]
+            batch_id_gt = torch.from_numpy(np.indices((batch, inds.shape[1]))[0]).to(
+                labels
+            )
             scores[batch_id_gt, inds] = scores[batch_id_gt, inds] + masks
             order = scores.sort(1, descending=True)[1]
-            order = order[:, :self.obj_num]
+            order = order[:, : self.obj_num]
             scores[batch_id_gt, inds] = scores[batch_id_gt, inds] - masks
         else:
             order = scores.sort(1, descending=True)[1]
-            order = order[:, :self.obj_num]
+            order = order[:, : self.obj_num]
             batch_targets = None
 
         scores = torch.gather(scores, 1, order)
@@ -485,10 +498,8 @@ class DeformableDecoderRPN(BaseDecoderRPN):
         src = torch.cat(
             (
                 x_up.reshape(batch, -1, H * W).transpose(2, 1).contiguous(),
-                x.reshape(batch, -1,
-                          (H * W) // 4).transpose(2, 1).contiguous(),
-                x_down.reshape(batch, -1,
-                               (H * W) // 16).transpose(2, 1).contiguous(),
+                x.reshape(batch, -1, (H * W) // 4).transpose(2, 1).contiguous(),
+                x_down.reshape(batch, -1, (H * W) // 16).transpose(2, 1).contiguous(),
             ),
             dim=1,
         )  # B ,sum(H*W), C
@@ -497,10 +508,12 @@ class DeformableDecoderRPN(BaseDecoderRPN):
             dtype=torch.long,
             device=ct_feat.device,
         )
-        level_start_index = torch.cat((
-            spatial_shapes.new_zeros((1, )),
-            spatial_shapes.prod(1).cumsum(0)[:-1],
-        ))
+        level_start_index = torch.cat(
+            (
+                spatial_shapes.new_zeros((1,)),
+                spatial_shapes.prod(1).cumsum(0)[:-1],
+            )
+        )
 
         transformer_out = self.transformer_decoder(
             ct_feat,
@@ -511,22 +524,20 @@ class DeformableDecoderRPN(BaseDecoderRPN):
             center_pos=pos_features,
         )  # (B,N,C)
 
-        ct_feat = (transformer_out['ct_feat'].transpose(2, 1).contiguous()
-                   )  # B, C, 500
+        ct_feat = transformer_out["ct_feat"].transpose(2, 1).contiguous()  # B, C, 500
 
         out_dict = {
-            'hm': hm,
-            'scores': scores,
-            'labels': labels,
-            'order': order,
-            'ct_feat': ct_feat,
-            'mask': mask,
+            "hm": hm,
+            "scores": scores,
+            "labels": labels,
+            "order": order,
+            "ct_feat": ct_feat,
+            "mask": mask,
         }
-        if 'out_attention' in transformer_out:
-            out_dict.update(
-                {'out_attention': transformer_out['out_attention']})
+        if "out_attention" in transformer_out:
+            out_dict.update({"out_attention": transformer_out["out_attention"]})
         if self.corner and self.corner_head.training:
-            out_dict.update({'corner_hm': corner_hm})
+            out_dict.update({"corner_hm": corner_hm})
 
         return out_dict, batch_targets
 
@@ -559,8 +570,9 @@ class DeformableDecoderRPN(BaseDecoderRPN):
                     boxes are valid.
                 - list[torch.Tensor]: catagrate labels.
         """
-        heatmaps, anno_boxes, inds, masks, corner_heatmaps, cat_labels = multi_apply(  # noqa: E501
-            self.get_targets_single, batch_gt_instances_3d)
+        heatmaps, anno_boxes, inds, masks, corner_heatmaps, cat_labels = multi_apply(
+            self.get_targets_single, batch_gt_instances_3d
+        )  # noqa: E501
         # Transpose heatmaps
         heatmaps = list(map(list, zip(*heatmaps)))
         heatmaps = [torch.stack(hms_) for hms_ in heatmaps]
@@ -581,8 +593,7 @@ class DeformableDecoderRPN(BaseDecoderRPN):
         cat_labels = [torch.stack(labels_) for labels_ in cat_labels]
         return heatmaps, anno_boxes, inds, masks, corner_heatmaps, cat_labels
 
-    def get_targets_single(self,
-                           gt_instances_3d: InstanceData) -> Tuple[Tensor]:
+    def get_targets_single(self, gt_instances_3d: InstanceData) -> Tuple[Tensor]:
         """Generate training targets for a single sample.
         Args:
             gt_instances_3d (:obj:`InstanceData`): Gt_instances of
@@ -603,23 +614,25 @@ class DeformableDecoderRPN(BaseDecoderRPN):
         gt_bboxes_3d = gt_instances_3d.bboxes_3d
         device = gt_labels_3d.device
         gt_bboxes_3d = torch.cat(
-            (gt_bboxes_3d.gravity_center, gt_bboxes_3d.tensor[:, 3:]),
-            dim=1).to(device)
-        max_objs = self.train_cfg['max_objs'] * self.train_cfg['dense_reg']
-        grid_size = torch.tensor(self.train_cfg['grid_size'])
-        pc_range = torch.tensor(self.train_cfg['point_cloud_range'])
-        voxel_size = torch.tensor(self.train_cfg['voxel_size'])
+            (gt_bboxes_3d.gravity_center, gt_bboxes_3d.tensor[:, 3:]), dim=1
+        ).to(device)
+        max_objs = self.train_cfg["max_objs"] * self.train_cfg["dense_reg"]
+        grid_size = torch.tensor(self.train_cfg["grid_size"])
+        pc_range = torch.tensor(self.train_cfg["point_cloud_range"])
+        voxel_size = torch.tensor(self.train_cfg["voxel_size"])
 
-        feature_map_size = grid_size[:2] // self.train_cfg['out_size_factor']
+        feature_map_size = grid_size[:2] // self.train_cfg["out_size_factor"]
 
         # reorganize the gt_dict by tasks
         task_masks = []
         flag = 0
         for class_name in self.class_names:
-            task_masks.append([
-                torch.where(gt_labels_3d == class_name.index(i) + flag)
-                for i in class_name
-            ])
+            task_masks.append(
+                [
+                    torch.where(gt_labels_3d == class_name.index(i) + flag)
+                    for i in class_name
+                ]
+            )
             flag += len(class_name)
 
         task_boxes = []
@@ -636,19 +649,26 @@ class DeformableDecoderRPN(BaseDecoderRPN):
             task_classes.append(torch.cat(task_class).long().to(device))
             flag2 += len(mask)
         draw_gaussian = draw_heatmap_gaussian
-        heatmaps, anno_boxes, inds, masks, corner_heatmaps, cat_labels = [], [], [], [], [], []  # noqa: E501
+        heatmaps, anno_boxes, inds, masks, corner_heatmaps, cat_labels = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )  # noqa: E501
 
         for idx in range(len(self.tasks)):
             heatmap = gt_bboxes_3d.new_zeros(
-                (len(self.class_names[idx]), feature_map_size[1],
-                 feature_map_size[0]))
+                (len(self.class_names[idx]), feature_map_size[1], feature_map_size[0])
+            )
             corner_heatmap = torch.zeros(
                 (1, feature_map_size[1], feature_map_size[0]),
                 dtype=torch.float32,
-                device=device)
+                device=device,
+            )
 
-            anno_box = gt_bboxes_3d.new_zeros((max_objs, 8),
-                                              dtype=torch.float32)
+            anno_box = gt_bboxes_3d.new_zeros((max_objs, 8), dtype=torch.float32)
 
             ind = gt_labels_3d.new_zeros((max_objs), dtype=torch.int64)
             mask = gt_bboxes_3d.new_zeros((max_objs), dtype=torch.uint8)
@@ -662,38 +682,45 @@ class DeformableDecoderRPN(BaseDecoderRPN):
                 # gt boxes [xyzlwhr]
                 length = task_boxes[idx][k][3]
                 width = task_boxes[idx][k][4]
-                length = length / voxel_size[0] / self.train_cfg[
-                    'out_size_factor']
-                width = width / voxel_size[1] / self.train_cfg[
-                    'out_size_factor']
+                length = length / voxel_size[0] / self.train_cfg["out_size_factor"]
+                width = width / voxel_size[1] / self.train_cfg["out_size_factor"]
 
                 if width > 0 and length > 0:
                     radius = gaussian_radius(
-                        (width, length),
-                        min_overlap=self.train_cfg['gaussian_overlap'])
-                    radius = max(self.train_cfg['min_radius'], int(radius))
+                        (width, length), min_overlap=self.train_cfg["gaussian_overlap"]
+                    )
+                    radius = max(self.train_cfg["min_radius"], int(radius))
 
                     # be really careful for the coordinate system of
                     # your box annotation.
-                    x, y, z = task_boxes[idx][k][0], task_boxes[idx][k][
-                        1], task_boxes[idx][k][2]
+                    x, y, z = (
+                        task_boxes[idx][k][0],
+                        task_boxes[idx][k][1],
+                        task_boxes[idx][k][2],
+                    )
 
                     coor_x = (
-                        x - pc_range[0]
-                    ) / voxel_size[0] / self.train_cfg['out_size_factor']
+                        (x - pc_range[0])
+                        / voxel_size[0]
+                        / self.train_cfg["out_size_factor"]
+                    )
                     coor_y = (
-                        y - pc_range[1]
-                    ) / voxel_size[1] / self.train_cfg['out_size_factor']
+                        (y - pc_range[1])
+                        / voxel_size[1]
+                        / self.train_cfg["out_size_factor"]
+                    )
 
-                    center = torch.tensor([coor_x, coor_y],
-                                          dtype=torch.float32,
-                                          device=device)
+                    center = torch.tensor(
+                        [coor_x, coor_y], dtype=torch.float32, device=device
+                    )
                     center_int = center.to(torch.int32)
 
                     # throw out not in range objects to avoid out of array
                     # area when creating the heatmap
-                    if not (0 <= center_int[0] < feature_map_size[0]
-                            and 0 <= center_int[1] < feature_map_size[1]):
+                    if not (
+                        0 <= center_int[0] < feature_map_size[0]
+                        and 0 <= center_int[1] < feature_map_size[1]
+                    ):
                         continue
 
                     draw_gaussian(heatmap[cls_id], center_int, radius)
@@ -703,36 +730,41 @@ class DeformableDecoderRPN(BaseDecoderRPN):
                     rot = task_boxes[idx][k][6]
                     corner_keypoints = center_to_corner_box2d(
                         center.unsqueeze(0).cpu().numpy(),
-                        torch.tensor([[length, width]],
-                                     dtype=torch.float32).numpy(),
+                        torch.tensor([[length, width]], dtype=torch.float32).numpy(),
                         angles=rot,
-                        origin=0.5)
-                    corner_keypoints = torch.from_numpy(corner_keypoints).to(
-                        center)
+                        origin=0.5,
+                    )
+                    corner_keypoints = torch.from_numpy(corner_keypoints).to(center)
 
                     draw_gaussian(corner_heatmap[0], center_int, radius)
                     draw_gaussian(
                         corner_heatmap[0],
                         (corner_keypoints[0, 0] + corner_keypoints[0, 1]) / 2,
-                        radius)
+                        radius,
+                    )
                     draw_gaussian(
                         corner_heatmap[0],
                         (corner_keypoints[0, 2] + corner_keypoints[0, 3]) / 2,
-                        radius)
+                        radius,
+                    )
                     draw_gaussian(
                         corner_heatmap[0],
                         (corner_keypoints[0, 0] + corner_keypoints[0, 3]) / 2,
-                        radius)
+                        radius,
+                    )
                     draw_gaussian(
                         corner_heatmap[0],
                         (corner_keypoints[0, 1] + corner_keypoints[0, 2]) / 2,
-                        radius)
+                        radius,
+                    )
 
                     new_idx = k
                     x, y = center_int[0], center_int[1]
 
-                    assert (y * feature_map_size[0] + x <
-                            feature_map_size[0] * feature_map_size[1])
+                    assert (
+                        y * feature_map_size[0] + x
+                        < feature_map_size[0] * feature_map_size[1]
+                    )
 
                     ind[new_idx] = y * feature_map_size[0] + x
                     mask[new_idx] = 1
@@ -742,12 +774,15 @@ class DeformableDecoderRPN(BaseDecoderRPN):
                     rot = task_boxes[idx][k][6]
                     box_dim = task_boxes[idx][k][3:6]
                     box_dim = box_dim.log()
-                    anno_box[new_idx] = torch.cat([
-                        center - torch.tensor([x, y], device=device),
-                        z.unsqueeze(0), box_dim,
-                        torch.sin(rot).unsqueeze(0),
-                        torch.cos(rot).unsqueeze(0)
-                    ])
+                    anno_box[new_idx] = torch.cat(
+                        [
+                            center - torch.tensor([x, y], device=device),
+                            z.unsqueeze(0),
+                            box_dim,
+                            torch.sin(rot).unsqueeze(0),
+                            torch.cos(rot).unsqueeze(0),
+                        ]
+                    )
 
             heatmaps.append(heatmap)
             corner_heatmaps.append(corner_heatmap)
@@ -770,25 +805,26 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
     """
 
     def __init__(
-            self,
-            layer_nums,  # [2,2,2]
-            ds_num_filters,  # [128,256,64]
-            num_input_features,  # 256
-            transformer_config=None,
-            hm_head_layer=2,
-            corner_head_layer=2,
-            corner=False,
-            parametric_embedding=False,
-            assign_label_window_size=1,
-            classes=3,
-            use_gt_training=False,
-            norm_cfg=None,
-            logger=None,
-            init_bias=-2.19,
-            score_threshold=0.1,
-            obj_num=500,
-            frame=1,
-            **kwargs):
+        self,
+        layer_nums,  # [2,2,2]
+        ds_num_filters,  # [128,256,64]
+        num_input_features,  # 256
+        transformer_config=None,
+        hm_head_layer=2,
+        corner_head_layer=2,
+        corner=False,
+        parametric_embedding=False,
+        assign_label_window_size=1,
+        classes=3,
+        use_gt_training=False,
+        norm_cfg=None,
+        logger=None,
+        init_bias=-2.19,
+        score_threshold=0.1,
+        obj_num=500,
+        frame=1,
+        **kwargs
+    ):
         super(MultiFrameDeformableDecoderRPN, self).__init__(
             layer_nums,
             ds_num_filters,
@@ -831,22 +867,19 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
             dim_ffn=transformer_config.dim_ffn,
             dropout=transformer_config.dropout,
             out_attention=transformer_config.out_attn,
-            n_points=transformer_config.get('n_points', 9),
+            n_points=transformer_config.get("n_points", 9),
         )
-        self.pos_embedding_type = transformer_config.get(
-            'pos_embedding_type', 'linear')
-        if self.pos_embedding_type == 'linear':
+        self.pos_embedding_type = transformer_config.get("pos_embedding_type", "linear")
+        if self.pos_embedding_type == "linear":
             self.pos_embedding = nn.Linear(2, self._num_filters[-1] * 2)
         else:
             raise NotImplementedError()
         self.parametric_embedding = parametric_embedding
         if self.parametric_embedding:
-            self.query_embed = nn.Embedding(self.obj_num,
-                                            self._num_filters[-1] * 2)
+            self.query_embed = nn.Embedding(self.obj_num, self._num_filters[-1] * 2)
             nn.init.uniform_(self.query_embed.weight, -1.0, 1.0)
 
-        print_log('Finish RPN_transformer_deformable Initialization',
-                  'current')
+        print_log("Finish RPN_transformer_deformable Initialization", "current")
 
     def forward(self, x, example=None):
 
@@ -866,13 +899,12 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
         x_up = torch.stack([t[0] for t in x_up], dim=0)  # B,C,H,W
         # use spatial attention in current frame on previous feature
         x_prev_cat = self.mtf_attention(
-            x_up,
-            x_prev.reshape(x_up.shape[0], -1, x_up.shape[2],
-                           x_up.shape[3]))  # B,K*C,H,W
+            x_up, x_prev.reshape(x_up.shape[0], -1, x_up.shape[2], x_up.shape[3])
+        )  # B,K*C,H,W
         # time embedding
         x_up_fuse = torch.cat((x_up, x_prev_cat), dim=1) + self.time_embedding(
-            example['times'][:, :, None].to(x_up)).reshape(
-                x_up.shape[0], -1, 1, 1)
+            example["times"][:, :, None].to(x_up)
+        ).reshape(x_up.shape[0], -1, 1, 1)
         # fuse mtf feature
         x_up_fuse = self.out(x_up_fuse)
 
@@ -887,37 +919,36 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
         hm = torch.sigmoid(hm)
         batch, num_cls, H, W = hm.size()
 
-        scores, labels = torch.max(
-            hm.reshape(batch, num_cls, H * W), dim=1)  # b,H*W
-        self.batch_id = torch.from_numpy(np.indices(
-            (batch, self.obj_num))[0]).to(labels)
+        scores, labels = torch.max(hm.reshape(batch, num_cls, H * W), dim=1)  # b,H*W
+        self.batch_id = torch.from_numpy(np.indices((batch, self.obj_num))[0]).to(
+            labels
+        )
 
         if self.use_gt_training and self.hm_head.training:
-            gt_inds = example['ind'][0][:, (self.window_size //
-                                            2)::self.window_size]
-            gt_masks = example['mask'][0][:, (self.window_size //
-                                              2)::self.window_size]
-            batch_id_gt = torch.from_numpy(
-                np.indices((batch, gt_inds.shape[1]))[0]).to(labels)
-            scores[batch_id_gt,
-                   gt_inds] = scores[batch_id_gt, gt_inds] + gt_masks
+            gt_inds = example["ind"][0][:, (self.window_size // 2) :: self.window_size]
+            gt_masks = example["mask"][0][
+                :, (self.window_size // 2) :: self.window_size
+            ]
+            batch_id_gt = torch.from_numpy(np.indices((batch, gt_inds.shape[1]))[0]).to(
+                labels
+            )
+            scores[batch_id_gt, gt_inds] = scores[batch_id_gt, gt_inds] + gt_masks
             order = scores.sort(1, descending=True)[1]
-            order = order[:, :self.obj_num]
-            scores[batch_id_gt,
-                   gt_inds] = scores[batch_id_gt, gt_inds] - gt_masks
+            order = order[:, : self.obj_num]
+            scores[batch_id_gt, gt_inds] = scores[batch_id_gt, gt_inds] - gt_masks
         else:
             order = scores.sort(1, descending=True)[1]
-            order = order[:, :self.obj_num]
+            order = order[:, : self.obj_num]
 
         scores = torch.gather(scores, 1, order)
         labels = torch.gather(labels, 1, order)
         mask = scores > self.score_threshold
 
-        ct_feat = (x_up.reshape(batch, -1,
-                                H * W).transpose(2,
-                                                 1).contiguous()[self.batch_id,
-                                                                 order]
-                   )  # B, 500, C
+        ct_feat = (
+            x_up.reshape(batch, -1, H * W)
+            .transpose(2, 1)
+            .contiguous()[self.batch_id, order]
+        )  # B, 500, C
 
         # create position embedding for each center
         y_coor = order // W
@@ -934,22 +965,27 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
         src_list = [
             x_up.reshape(batch, -1, H * W).transpose(2, 1).contiguous(),
             x.reshape(batch, -1, (H * W) // 4).transpose(2, 1).contiguous(),
-            x_down.reshape(batch, -1, (H * W) // 16).transpose(2,
-                                                               1).contiguous(),
+            x_down.reshape(batch, -1, (H * W) // 16).transpose(2, 1).contiguous(),
         ]
         for frame in range(x_prev.shape[1]):
-            src_list.append(x_prev[:, frame].reshape(batch,
-                                                     -1, (H * W)).transpose(
-                                                         2, 1).contiguous())
+            src_list.append(
+                x_prev[:, frame]
+                .reshape(batch, -1, (H * W))
+                .transpose(2, 1)
+                .contiguous()
+            )
         src = torch.cat(src_list, dim=1)  # B ,sum(H*W), C
         spatial_list = [(H, W), (H // 2, W // 2), (H // 4, W // 4)]
         spatial_list += [(H, W) for frame in range(x_prev.shape[1])]
         spatial_shapes = torch.as_tensor(
-            spatial_list, dtype=torch.long, device=ct_feat.device)
-        level_start_index = torch.cat((
-            spatial_shapes.new_zeros((1, )),
-            spatial_shapes.prod(1).cumsum(0)[:-1],
-        ))
+            spatial_list, dtype=torch.long, device=ct_feat.device
+        )
+        level_start_index = torch.cat(
+            (
+                spatial_shapes.new_zeros((1,)),
+                spatial_shapes.prod(1).cumsum(0)[:-1],
+            )
+        )
 
         transformer_out = self.transformer_decoder(
             ct_feat,
@@ -960,21 +996,19 @@ class MultiFrameDeformableDecoderRPN(BaseDecoderRPN):
             center_pos=pos_features,
         )  # (B,N,C)
 
-        ct_feat = (transformer_out['ct_feat'].transpose(2, 1).contiguous()
-                   )  # B, C, 500
+        ct_feat = transformer_out["ct_feat"].transpose(2, 1).contiguous()  # B, C, 500
 
         out_dict = {
-            'hm': hm,
-            'scores': scores,
-            'labels': labels,
-            'order': order,
-            'ct_feat': ct_feat,
-            'mask': mask,
+            "hm": hm,
+            "scores": scores,
+            "labels": labels,
+            "order": order,
+            "ct_feat": ct_feat,
+            "mask": mask,
         }
-        if 'out_attention' in transformer_out:
-            out_dict.update(
-                {'out_attention': transformer_out['out_attention']})
+        if "out_attention" in transformer_out:
+            out_dict.update({"out_attention": transformer_out["out_attention"]})
         if self.corner and self.corner_head.training:
-            out_dict.update({'corner_hm': corner_hm})
+            out_dict.update({"corner_hm": corner_hm})
 
         return out_dict

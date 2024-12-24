@@ -9,7 +9,14 @@ from .transforms_3d import ObjectRangeFilter3D, PointsRangeFilter3D
 from .utils import DSVTBBoxCoder
 
 __all__ = [
-    'DSVTCenterHead', 'DSVT', 'DSVTMiddleEncoder', 'DynamicPillarVFE3D',
-    'PointPillarsScatter3D', 'ResSECOND', 'DSVTBBoxCoder',
-    'ObjectRangeFilter3D', 'PointsRangeFilter3D', 'DisableAugHook'
+    "DSVTCenterHead",
+    "DSVT",
+    "DSVTMiddleEncoder",
+    "DynamicPillarVFE3D",
+    "PointPillarsScatter3D",
+    "ResSECOND",
+    "DSVTBBoxCoder",
+    "ObjectRangeFilter3D",
+    "PointsRangeFilter3D",
+    "DisableAugHook",
 ]

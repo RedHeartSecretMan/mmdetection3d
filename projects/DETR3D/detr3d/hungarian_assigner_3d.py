@@ -1,12 +1,12 @@
 from typing import List
 
 import torch
+from mmdet3d.registry import TASK_UTILS
 from mmdet.models.task_modules.assigners import AssignResult  # check
 from mmdet.models.task_modules.assigners import BaseAssigner
 from mmengine.structures import InstanceData
 from torch import Tensor
 
-from mmdet3d.registry import TASK_UTILS
 from .util import normalize_bbox
 
 try:
@@ -38,23 +38,27 @@ class HungarianAssigner3D(BaseAssigner):
         pc_range: perception range of the detector
     """
 
-    def __init__(self,
-                 cls_cost=dict(type='ClassificationCost', weight=1.),
-                 reg_cost=dict(type='BBoxL1Cost', weight=1.0),
-                 iou_cost=dict(type='IoUCost', weight=0.0),
-                 pc_range: List = None):
+    def __init__(
+        self,
+        cls_cost=dict(type="ClassificationCost", weight=1.0),
+        reg_cost=dict(type="BBoxL1Cost", weight=1.0),
+        iou_cost=dict(type="IoUCost", weight=0.0),
+        pc_range: List = None,
+    ):
         self.cls_cost = TASK_UTILS.build(cls_cost)
         self.reg_cost = TASK_UTILS.build(reg_cost)
         self.iou_cost = TASK_UTILS.build(iou_cost)
         self.pc_range = pc_range
 
-    def assign(self,
-               bbox_pred: Tensor,
-               cls_pred: Tensor,
-               gt_bboxes: Tensor,
-               gt_labels: Tensor,
-               gt_bboxes_ignore=None,
-               eps=1e-7) -> AssignResult:
+    def assign(
+        self,
+        bbox_pred: Tensor,
+        cls_pred: Tensor,
+        gt_bboxes: Tensor,
+        gt_labels: Tensor,
+        gt_bboxes_ignore=None,
+        eps=1e-7,
+    ) -> AssignResult:
         """Computes one-to-one matching based on the weighted costs.
         This method assign each query prediction to a ground truth or
         background. The `assigned_gt_inds` with -1 means don't care,
@@ -82,24 +86,20 @@ class HungarianAssigner3D(BaseAssigner):
         Returns:
             :obj:`AssignResult`: The assigned result.
         """
-        assert gt_bboxes_ignore is None, \
-            'Only case when gt_bboxes_ignore is None is supported.'
+        assert (
+            gt_bboxes_ignore is None
+        ), "Only case when gt_bboxes_ignore is None is supported."
         num_gts, num_bboxes = gt_bboxes.size(0), bbox_pred.size(0)  # 9, 900
 
         # 1. assign -1 by default
-        assigned_gt_inds = bbox_pred.new_full((num_bboxes, ),
-                                              -1,
-                                              dtype=torch.long)
-        assigned_labels = bbox_pred.new_full((num_bboxes, ),
-                                             -1,
-                                             dtype=torch.long)
+        assigned_gt_inds = bbox_pred.new_full((num_bboxes,), -1, dtype=torch.long)
+        assigned_labels = bbox_pred.new_full((num_bboxes,), -1, dtype=torch.long)
         if num_gts == 0 or num_bboxes == 0:
             # No ground truth or boxes, return empty assignment
             if num_gts == 0:
                 # No ground truth, assign all to background
                 assigned_gt_inds[:] = 0
-            return AssignResult(
-                num_gts, assigned_gt_inds, None, labels=assigned_labels)
+            return AssignResult(num_gts, assigned_gt_inds, None, labels=assigned_labels)
 
         # 2. compute the weighted costs
         # classification and bboxcost.
@@ -117,13 +117,12 @@ class HungarianAssigner3D(BaseAssigner):
         # 3. do Hungarian matching on CPU using linear_sum_assignment
         cost = cost.detach().cpu()
         if linear_sum_assignment is None:
-            raise ImportError('Please run "pip install scipy" '
-                              'to install scipy first.')
+            raise ImportError(
+                'Please run "pip install scipy" ' "to install scipy first."
+            )
         matched_row_inds, matched_col_inds = linear_sum_assignment(cost)
-        matched_row_inds = torch.from_numpy(matched_row_inds).to(
-            bbox_pred.device)
-        matched_col_inds = torch.from_numpy(matched_col_inds).to(
-            bbox_pred.device)
+        matched_row_inds = torch.from_numpy(matched_row_inds).to(bbox_pred.device)
+        matched_col_inds = torch.from_numpy(matched_col_inds).to(bbox_pred.device)
 
         # 4. assign backgrounds and foregrounds
         # assign all indices to backgrounds first
@@ -131,5 +130,4 @@ class HungarianAssigner3D(BaseAssigner):
         # assign foregrounds based on matching results
         assigned_gt_inds[matched_row_inds] = matched_col_inds + 1
         assigned_labels[matched_row_inds] = gt_labels[matched_col_inds]
-        return AssignResult(
-            num_gts, assigned_gt_inds, None, labels=assigned_labels)
+        return AssignResult(num_gts, assigned_gt_inds, None, labels=assigned_labels)

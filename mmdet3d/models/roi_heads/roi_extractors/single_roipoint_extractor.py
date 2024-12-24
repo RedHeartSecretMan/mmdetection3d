@@ -4,10 +4,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from mmcv import ops
-from torch import Tensor
-
 from mmdet3d.registry import MODELS
 from mmdet3d.structures.bbox_3d import rotation_3d_in_axis
+from torch import Tensor
 
 
 @MODELS.register_module()
@@ -27,14 +26,15 @@ class Single3DRoIPointExtractor(nn.Module):
     def build_roi_layers(self, layer_cfg: dict) -> nn.Module:
         """Build roi layers using `layer_cfg`"""
         cfg = layer_cfg.copy()
-        layer_type = cfg.pop('type')
+        layer_type = cfg.pop("type")
         assert hasattr(ops, layer_type)
         layer_cls = getattr(ops, layer_type)
         roi_layers = layer_cls(**cfg)
         return roi_layers
 
-    def forward(self, feats: Tensor, coordinate: Tensor, batch_inds: Tensor,
-                rois: Tensor) -> Tensor:
+    def forward(
+        self, feats: Tensor, coordinate: Tensor, batch_inds: Tensor, rois: Tensor
+    ) -> Tensor:
         """Extract point-wise roi features.
 
         Args:
@@ -50,19 +50,19 @@ class Single3DRoIPointExtractor(nn.Module):
         rois = rois[..., 1:]
         rois = rois.view(batch_inds, -1, rois.shape[-1])
         with torch.no_grad():
-            pooled_roi_feat, pooled_empty_flag = self.roi_layer(
-                coordinate, feats, rois)
+            pooled_roi_feat, pooled_empty_flag = self.roi_layer(coordinate, feats, rois)
 
             # canonical transformation
             roi_center = rois[:, :, 0:3]
             pooled_roi_feat[:, :, :, 0:3] -= roi_center.unsqueeze(dim=2)
-            pooled_roi_feat = pooled_roi_feat.view(-1,
-                                                   pooled_roi_feat.shape[-2],
-                                                   pooled_roi_feat.shape[-1])
+            pooled_roi_feat = pooled_roi_feat.view(
+                -1, pooled_roi_feat.shape[-2], pooled_roi_feat.shape[-1]
+            )
             pooled_roi_feat[:, :, 0:3] = rotation_3d_in_axis(
                 pooled_roi_feat[:, :, 0:3],
                 -(rois.view(-1, rois.shape[-1])[:, 6]),
-                axis=2)
+                axis=2,
+            )
             pooled_roi_feat[pooled_empty_flag.view(-1) > 0] = 0
 
         return pooled_roi_feat

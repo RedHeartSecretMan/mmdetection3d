@@ -2,12 +2,11 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor
-from torch.nn.modules.batchnorm import _BatchNorm
-
 from mmdet3d.models.detectors import Base3DDetector
 from mmdet3d.registry import MODELS
 from mmdet3d.structures import Det3DDataSample
+from torch import Tensor
+from torch.nn.modules.batchnorm import _BatchNorm
 
 
 @MODELS.register_module()
@@ -37,19 +36,22 @@ class CenterFormer(Base3DDetector):
             config of :class:`Det3DDataPreprocessor`. Defaults to None.
     """
 
-    def __init__(self,
-                 voxel_encoder: Optional[dict] = None,
-                 middle_encoder: Optional[dict] = None,
-                 backbone: Optional[dict] = None,
-                 neck: Optional[dict] = None,
-                 bbox_head: Optional[dict] = None,
-                 train_cfg: Optional[dict] = None,
-                 test_cfg: Optional[dict] = None,
-                 init_cfg: Optional[dict] = None,
-                 data_preprocessor: Optional[dict] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        voxel_encoder: Optional[dict] = None,
+        middle_encoder: Optional[dict] = None,
+        backbone: Optional[dict] = None,
+        neck: Optional[dict] = None,
+        bbox_head: Optional[dict] = None,
+        train_cfg: Optional[dict] = None,
+        test_cfg: Optional[dict] = None,
+        init_cfg: Optional[dict] = None,
+        data_preprocessor: Optional[dict] = None,
+        **kwargs
+    ):
         super(CenterFormer, self).__init__(
-            init_cfg=init_cfg, data_preprocessor=data_preprocessor, **kwargs)
+            init_cfg=init_cfg, data_preprocessor=data_preprocessor, **kwargs
+        )
 
         if voxel_encoder:
             self.voxel_encoder = MODELS.build(voxel_encoder)
@@ -75,30 +77,29 @@ class CenterFormer(Base3DDetector):
     @property
     def with_bbox(self):
         """bool: Whether the detector has a 3D box head."""
-        return hasattr(self, 'bbox_head') and self.bbox_head is not None
+        return hasattr(self, "bbox_head") and self.bbox_head is not None
 
     @property
     def with_backbone(self):
         """bool: Whether the detector has a 3D backbone."""
-        return hasattr(self, 'backbone') and self.backbone is not None
+        return hasattr(self, "backbone") and self.backbone is not None
 
     @property
     def with_voxel_encoder(self):
         """bool: Whether the detector has a voxel encoder."""
-        return hasattr(self,
-                       'voxel_encoder') and self.voxel_encoder is not None
+        return hasattr(self, "voxel_encoder") and self.voxel_encoder is not None
 
     @property
     def with_middle_encoder(self):
         """bool: Whether the detector has a middle encoder."""
-        return hasattr(self,
-                       'middle_encoder') and self.middle_encoder is not None
+        return hasattr(self, "middle_encoder") and self.middle_encoder is not None
 
     def _forward(self):
         pass
 
-    def extract_feat(self, batch_inputs_dict: dict,
-                     batch_input_metas: List[dict]) -> tuple:
+    def extract_feat(
+        self, batch_inputs_dict: dict, batch_input_metas: List[dict]
+    ) -> tuple:
         """Extract features from images and points.
         Args:
             batch_inputs_dict (dict): Dict of batch inputs. It
@@ -111,17 +112,21 @@ class CenterFormer(Base3DDetector):
              tuple: Two elements in tuple arrange as
              image features and point cloud features.
         """
-        voxel_dict = batch_inputs_dict.get('voxels', None)
+        voxel_dict = batch_inputs_dict.get("voxels", None)
         voxel_features, feature_coors = self.voxel_encoder(
-            voxel_dict['voxels'], voxel_dict['coors'])
-        batch_size = voxel_dict['coors'][-1, 0].item() + 1
+            voxel_dict["voxels"], voxel_dict["coors"]
+        )
+        batch_size = voxel_dict["coors"][-1, 0].item() + 1
         x = self.middle_encoder(voxel_features, feature_coors, batch_size)
 
         return x
 
-    def loss(self, batch_inputs_dict: Dict[List, torch.Tensor],
-             batch_data_samples: List[Det3DDataSample],
-             **kwargs) -> List[Det3DDataSample]:
+    def loss(
+        self,
+        batch_inputs_dict: Dict[List, torch.Tensor],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """
         Args:
             batch_inputs_dict (dict): The model input dict which include
@@ -145,9 +150,12 @@ class CenterFormer(Base3DDetector):
         return losses
         # return self.bbox_head.predict(preds, batch_tatgets)
 
-    def predict(self, batch_inputs_dict: Dict[str, Optional[Tensor]],
-                batch_data_samples: List[Det3DDataSample],
-                **kwargs) -> List[Det3DDataSample]:
+    def predict(
+        self,
+        batch_inputs_dict: Dict[str, Optional[Tensor]],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """Forward of testing.
         Args:
             batch_inputs_dict (dict): The model input dict which include
@@ -175,6 +183,5 @@ class CenterFormer(Base3DDetector):
         preds = self.bbox_head(preds)
         results_list_3d = self.bbox_head.predict(preds, batch_input_metas)
 
-        detsamples = self.add_pred_to_datasample(batch_data_samples,
-                                                 results_list_3d)
+        detsamples = self.add_pred_to_datasample(batch_data_samples, results_list_3d)
         return detsamples

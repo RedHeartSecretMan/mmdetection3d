@@ -11,7 +11,7 @@ import pandas as pd
 BASE_DIR = osp.dirname(osp.abspath(__file__))
 
 class_names = [
-    x.rstrip() for x in open(osp.join(BASE_DIR, 'meta_data/class_names.txt'))
+    x.rstrip() for x in open(osp.join(BASE_DIR, "meta_data/class_names.txt"))
 ]
 class2label = {one_class: i for i, one_class in enumerate(class_names)}
 
@@ -36,11 +36,11 @@ def export(anno_path, out_filename):
     points_list = []
     ins_idx = 1  # instance ids should be indexed from 1, so 0 is unannotated
 
-    for f in glob.glob(osp.join(anno_path, '*.txt')):
-        one_class = osp.basename(f).split('_')[0]
+    for f in glob.glob(osp.join(anno_path, "*.txt")):
+        one_class = osp.basename(f).split("_")[0]
         if one_class not in class_names:  # some rooms have 'staris' class
-            one_class = 'clutter'
-        points = pd.read_csv(f, header=None, sep=' ').to_numpy()
+            one_class = "clutter"
+        points = pd.read_csv(f, header=None, sep=" ").to_numpy()
         labels = np.ones((points.shape[0], 1)) * class2label[one_class]
         ins_labels = np.ones((points.shape[0], 1)) * ins_idx
         ins_idx += 1
@@ -50,6 +50,6 @@ def export(anno_path, out_filename):
     xyz_min = np.amin(data_label, axis=0)[0:3]
     data_label[:, 0:3] -= xyz_min
 
-    np.save(f'{out_filename}_point.npy', data_label[:, :6].astype(np.float32))
-    np.save(f'{out_filename}_sem_label.npy', data_label[:, 6].astype(np.int64))
-    np.save(f'{out_filename}_ins_label.npy', data_label[:, 7].astype(np.int64))
+    np.save(f"{out_filename}_point.npy", data_label[:, :6].astype(np.float32))
+    np.save(f"{out_filename}_sem_label.npy", data_label[:, 6].astype(np.int64))
+    np.save(f"{out_filename}_ins_label.npy", data_label[:, 7].astype(np.int64))

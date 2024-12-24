@@ -1,9 +1,8 @@
 # modify from https://github.com/TuSimple/centerformer/blob/master/det3d/models/losses/centernet_loss.py # noqa
 
 import torch
-from torch import nn
-
 from mmdet3d.registry import MODELS
+from torch import nn
 
 
 def _gather_feat(feat, ind, mask=None):
@@ -36,12 +35,12 @@ class FastFocalLoss(nn.Module):
         self.focal_factor = focal_factor
 
     def forward(self, out, target, ind, mask, cat):
-        '''
+        """
         Args:
             out, target: B x C x H x W
             ind, mask: B x M
             cat (category id for peaks): B x M
-        '''
+        """
         mask = mask.float()
         gt = torch.pow(1 - target, 4)
         neg_loss = torch.log(1 - out) * torch.pow(out, self.focal_factor) * gt
@@ -50,8 +49,11 @@ class FastFocalLoss(nn.Module):
         pos_pred_pix = _transpose_and_gather_feat(out, ind)  # B x M x C
         pos_pred = pos_pred_pix.gather(2, cat.unsqueeze(2))  # B x M
         num_pos = mask.sum()
-        pos_loss = torch.log(pos_pred) * torch.pow(
-            1 - pos_pred, self.focal_factor) * mask.unsqueeze(2)
+        pos_loss = (
+            torch.log(pos_pred)
+            * torch.pow(1 - pos_pred, self.focal_factor)
+            * mask.unsqueeze(2)
+        )
         pos_loss = pos_loss.sum()
         if num_pos == 0:
             return -neg_loss

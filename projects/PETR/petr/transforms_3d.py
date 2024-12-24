@@ -2,10 +2,9 @@
 import numpy as np
 import torch
 from mmcv.transforms import BaseTransform
-from PIL import Image
-
 from mmdet3d.registry import TRANSFORMS
 from mmdet3d.structures.bbox_3d import LiDARInstance3DBoxes
+from PIL import Image
 
 
 @TRANSFORMS.register_module()
@@ -28,16 +27,16 @@ class ResizeCropFlipImage(BaseTransform):
             dict: Updated result dict.
         """
 
-        imgs = results['img']
+        imgs = results["img"]
         N = len(imgs)
         new_imgs = []
         resize, resize_dims, crop, flip, rotate = self._sample_augmentation()
-        results['lidar2cam'] = np.array(results['lidar2cam'])
+        results["lidar2cam"] = np.array(results["lidar2cam"])
         for i in range(N):
-            intrinsic = np.array(results['cam2img'][i])
+            intrinsic = np.array(results["cam2img"][i])
             viewpad = np.eye(4)
-            viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
-            results['cam2img'][i] = viewpad
+            viewpad[: intrinsic.shape[0], : intrinsic.shape[1]] = intrinsic
+            results["cam2img"][i] = viewpad
             img = Image.fromarray(np.uint8(imgs[i]))
             # augmentation (resize, crop, horizontal flip, rotate)
             # different view use different aug (BEV Det)
@@ -50,19 +49,20 @@ class ResizeCropFlipImage(BaseTransform):
                 rotate=rotate,
             )
             new_imgs.append(np.array(img).astype(np.float32))
-            results['cam2img'][
-                i][:3, :3] = ida_mat @ results['cam2img'][i][:3, :3]
+            results["cam2img"][i][:3, :3] = ida_mat @ results["cam2img"][i][:3, :3]
 
-        results['img'] = new_imgs
+        results["img"] = new_imgs
 
         return results
 
     def _get_rot(self, h):
 
-        return torch.Tensor([
-            [np.cos(h), np.sin(h)],
-            [-np.sin(h), np.cos(h)],
-        ])
+        return torch.Tensor(
+            [
+                [np.cos(h), np.sin(h)],
+                [-np.sin(h), np.cos(h)],
+            ]
+        )
 
     def _img_transform(self, img, resize, resize_dims, crop, flip, rotate):
         ida_rot = torch.eye(2)
@@ -93,27 +93,27 @@ class ResizeCropFlipImage(BaseTransform):
         return img, ida_mat
 
     def _sample_augmentation(self):
-        H, W = self.data_aug_conf['H'], self.data_aug_conf['W']
-        fH, fW = self.data_aug_conf['final_dim']
+        H, W = self.data_aug_conf["H"], self.data_aug_conf["W"]
+        fH, fW = self.data_aug_conf["final_dim"]
         if self.training:
-            resize = np.random.uniform(*self.data_aug_conf['resize_lim'])
+            resize = np.random.uniform(*self.data_aug_conf["resize_lim"])
             resize_dims = (int(W * resize), int(H * resize))
             newW, newH = resize_dims
-            crop_h = int(
-                (1 - np.random.uniform(*self.data_aug_conf['bot_pct_lim'])) *
-                newH) - fH
+            crop_h = (
+                int((1 - np.random.uniform(*self.data_aug_conf["bot_pct_lim"])) * newH)
+                - fH
+            )
             crop_w = int(np.random.uniform(0, max(0, newW - fW)))
             crop = (crop_w, crop_h, crop_w + fW, crop_h + fH)
             flip = False
-            if self.data_aug_conf['rand_flip'] and np.random.choice([0, 1]):
+            if self.data_aug_conf["rand_flip"] and np.random.choice([0, 1]):
                 flip = True
-            rotate = np.random.uniform(*self.data_aug_conf['rot_lim'])
+            rotate = np.random.uniform(*self.data_aug_conf["rot_lim"])
         else:
             resize = max(fH / H, fW / W)
             resize_dims = (int(W * resize), int(H * resize))
             newW, newH = resize_dims
-            crop_h = int(
-                (1 - np.mean(self.data_aug_conf['bot_pct_lim'])) * newH) - fH
+            crop_h = int((1 - np.mean(self.data_aug_conf["bot_pct_lim"])) * newH) - fH
             crop_w = int(max(0, newW - fW) / 2)
             crop = (crop_w, crop_h, crop_w + fW, crop_h + fH)
             flip = False
@@ -158,19 +158,18 @@ class GlobalRotScaleTransImage(BaseTransform):
         self.rotate_bev_along_z(results, rot_angle)
         if self.reverse_angle:
             rot_angle *= -1
-        results['gt_bboxes_3d'].rotate(np.array(rot_angle))
+        results["gt_bboxes_3d"].rotate(np.array(rot_angle))
 
         # random scale
         scale_ratio = np.random.uniform(*self.scale_ratio_range)
         self.scale_xyz(results, scale_ratio)
-        results['gt_bboxes_3d'].scale(scale_ratio)
+        results["gt_bboxes_3d"].scale(scale_ratio)
 
         # TODO: support translation
         if not self.reverse_angle:
-            gt_bboxes_3d = results['gt_bboxes_3d'].numpy()
+            gt_bboxes_3d = results["gt_bboxes_3d"].numpy()
             gt_bboxes_3d[:, 6] -= 2 * rot_angle
-            results['gt_bboxes_3d'] = LiDARInstance3DBoxes(
-                gt_bboxes_3d, box_dim=9)
+            results["gt_bboxes_3d"] = LiDARInstance3DBoxes(gt_bboxes_3d, box_dim=9)
 
         return results
 
@@ -178,32 +177,40 @@ class GlobalRotScaleTransImage(BaseTransform):
         rot_cos = torch.cos(torch.tensor(angle))
         rot_sin = torch.sin(torch.tensor(angle))
 
-        rot_mat = torch.tensor([[rot_cos, -rot_sin, 0, 0],
-                                [rot_sin, rot_cos, 0, 0], [0, 0, 1, 0],
-                                [0, 0, 0, 1]])
+        rot_mat = torch.tensor(
+            [
+                [rot_cos, -rot_sin, 0, 0],
+                [rot_sin, rot_cos, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ]
+        )
         rot_mat_inv = torch.inverse(rot_mat)
-        num_view = len(results['lidar2cam'])
+        num_view = len(results["lidar2cam"])
         for view in range(num_view):
-            results['lidar2cam'][view] = (
-                torch.tensor(np.array(results['lidar2cam'][view]).T).float()
-                @ rot_mat_inv).T.numpy()
+            results["lidar2cam"][view] = (
+                torch.tensor(np.array(results["lidar2cam"][view]).T).float()
+                @ rot_mat_inv
+            ).T.numpy()
 
         return
 
     def scale_xyz(self, results, scale_ratio):
-        rot_mat = torch.tensor([
-            [scale_ratio, 0, 0, 0],
-            [0, scale_ratio, 0, 0],
-            [0, 0, scale_ratio, 0],
-            [0, 0, 0, 1],
-        ])
+        rot_mat = torch.tensor(
+            [
+                [scale_ratio, 0, 0, 0],
+                [0, scale_ratio, 0, 0],
+                [0, 0, scale_ratio, 0],
+                [0, 0, 0, 1],
+            ]
+        )
 
         rot_mat_inv = torch.inverse(rot_mat)
 
-        num_view = len(results['lidar2cam'])
+        num_view = len(results["lidar2cam"])
         for view in range(num_view):
-            results['lidar2cam'][view] = (torch.tensor(
-                rot_mat_inv.T
-                @ results['lidar2cam'][view].T).float()).T.numpy()
+            results["lidar2cam"][view] = (
+                torch.tensor(rot_mat_inv.T @ results["lidar2cam"][view].T).float()
+            ).T.numpy()
 
         return

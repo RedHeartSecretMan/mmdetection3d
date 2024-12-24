@@ -1,9 +1,8 @@
 from typing import Union
 
 import torch
-from torch import Tensor
-
 from mmdet3d.registry import TASK_UTILS
+from torch import Tensor
 
 
 @TASK_UTILS.register_module()
@@ -14,7 +13,7 @@ class BBox3DL1Cost(object):
         weight (Union[float, int]): Cost weight. Defaults to 1.
     """
 
-    def __init__(self, weight: Union[float, int] = 1.):
+    def __init__(self, weight: Union[float, int] = 1.0):
         self.weight = weight
 
     def __call__(self, bbox_pred: Tensor, gt_bboxes: Tensor) -> Tensor:

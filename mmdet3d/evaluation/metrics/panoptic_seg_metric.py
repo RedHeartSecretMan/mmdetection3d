@@ -2,10 +2,10 @@
 
 from typing import Dict, List, Optional
 
-from mmengine.logging import MMLogger
-
 from mmdet3d.evaluation import panoptic_seg_eval
 from mmdet3d.registry import METRICS
+from mmengine.logging import MMLogger
+
 from .seg_metric import SegMetric
 
 
@@ -35,16 +35,18 @@ class PanopticSegMetric(SegMetric):
             Default to None.
     """
 
-    def __init__(self,
-                 thing_class_inds: List[int],
-                 stuff_class_inds: List[int],
-                 min_num_points: int,
-                 id_offset: int,
-                 collect_device: str = 'cpu',
-                 prefix: Optional[str] = None,
-                 pklfile_prefix: str = None,
-                 submission_prefix: str = None,
-                 **kwargs):
+    def __init__(
+        self,
+        thing_class_inds: List[int],
+        stuff_class_inds: List[int],
+        min_num_points: int,
+        id_offset: int,
+        collect_device: str = "cpu",
+        prefix: Optional[str] = None,
+        pklfile_prefix: str = None,
+        submission_prefix: str = None,
+        **kwargs
+    ):
         self.thing_class_inds = thing_class_inds
         self.stuff_class_inds = stuff_class_inds
         self.min_num_points = min_num_points
@@ -55,7 +57,8 @@ class PanopticSegMetric(SegMetric):
             submission_prefix=submission_prefix,
             prefix=prefix,
             collect_device=collect_device,
-            **kwargs)
+            **kwargs
+        )
 
     # TODO modify format_result for panoptic segmentation evaluation, \
     # different datasets have different needs.
@@ -76,9 +79,9 @@ class PanopticSegMetric(SegMetric):
             self.format_results(results)
             return None
 
-        label2cat = self.dataset_meta['label2cat']
-        ignore_index = self.dataset_meta['ignore_index']
-        classes = self.dataset_meta['classes']
+        label2cat = self.dataset_meta["label2cat"]
+        ignore_index = self.dataset_meta["ignore_index"]
+        classes = self.dataset_meta["classes"]
         thing_classes = [classes[i] for i in self.thing_class_inds]
         stuff_classes = [classes[i] for i in self.stuff_class_inds]
 
@@ -88,9 +91,17 @@ class PanopticSegMetric(SegMetric):
             gt_labels.append(eval_ann)
             seg_preds.append(sinlge_pred_results)
 
-        ret_dict = panoptic_seg_eval(gt_labels, seg_preds, classes,
-                                     thing_classes, stuff_classes,
-                                     self.min_num_points, self.id_offset,
-                                     label2cat, [ignore_index], logger)
+        ret_dict = panoptic_seg_eval(
+            gt_labels,
+            seg_preds,
+            classes,
+            thing_classes,
+            stuff_classes,
+            self.min_num_points,
+            self.id_offset,
+            label2cat,
+            [ignore_index],
+            logger,
+        )
 
         return ret_dict

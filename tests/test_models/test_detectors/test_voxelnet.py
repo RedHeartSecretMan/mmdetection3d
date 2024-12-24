@@ -2,11 +2,9 @@
 import unittest
 
 import torch
-from mmengine import DefaultScope
-
 from mmdet3d.registry import MODELS
-from mmdet3d.testing import (create_detector_inputs, get_detector_cfg,
-                             setup_seed)
+from mmdet3d.testing import create_detector_inputs, get_detector_cfg, setup_seed
+from mmengine import DefaultScope
 
 
 class TestVoxelNet(unittest.TestCase):
@@ -14,11 +12,12 @@ class TestVoxelNet(unittest.TestCase):
     def test_voxelnet(self):
         import mmdet3d.models
 
-        assert hasattr(mmdet3d.models, 'VoxelNet')
-        DefaultScope.get_instance('test_voxelnet', scope_name='mmdet3d')
+        assert hasattr(mmdet3d.models, "VoxelNet")
+        DefaultScope.get_instance("test_voxelnet", scope_name="mmdet3d")
         setup_seed(0)
         pointpillars_cfg = get_detector_cfg(
-            'pointpillars/pointpillars_hv_secfpn_8xb6-160e_kitti-3d-3class.py')
+            "pointpillars/pointpillars_hv_secfpn_8xb6-160e_kitti-3d-3class.py"
+        )
         model = MODELS.build(pointpillars_cfg)
         num_gt_instance = 2
         packed_inputs = create_detector_inputs(num_gt_instance=num_gt_instance)
@@ -44,11 +43,11 @@ class TestVoxelNet(unittest.TestCase):
             with torch.no_grad():
                 data = model.data_preprocessor(packed_inputs, True)
                 torch.cuda.empty_cache()
-                results = model.forward(**data, mode='predict')
+                results = model.forward(**data, mode="predict")
             self.assertEqual(len(results), 1)
-            self.assertIn('bboxes_3d', results[0].pred_instances_3d)
-            self.assertIn('scores_3d', results[0].pred_instances_3d)
-            self.assertIn('labels_3d', results[0].pred_instances_3d)
+            self.assertIn("bboxes_3d", results[0].pred_instances_3d)
+            self.assertIn("scores_3d", results[0].pred_instances_3d)
+            self.assertIn("labels_3d", results[0].pred_instances_3d)
 
             # TODO: Support aug_test
             # batch_inputs, data_samples = model.data_preprocessor(
@@ -66,8 +65,8 @@ class TestVoxelNet(unittest.TestCase):
             # save the memory
 
             with torch.no_grad():
-                losses = model.forward(**data, mode='loss')
+                losses = model.forward(**data, mode="loss")
                 torch.cuda.empty_cache()
-            self.assertGreaterEqual(losses['loss_dir'][0], 0)
-            self.assertGreaterEqual(losses['loss_bbox'][0], 0)
-            self.assertGreaterEqual(losses['loss_cls'][0], 0)
+            self.assertGreaterEqual(losses["loss_dir"][0], 0)
+            self.assertGreaterEqual(losses["loss_bbox"][0], 0)
+            self.assertGreaterEqual(losses["loss_cls"][0], 0)

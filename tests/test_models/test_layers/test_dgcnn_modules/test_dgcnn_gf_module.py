@@ -12,16 +12,17 @@ def test_dgcnn_gf_module():
     self = DGCNNGFModule(
         mlp_channels=[18, 64, 64],
         num_sample=20,
-        knn_mode='D-KNN',
+        knn_mode="D-KNN",
         radius=None,
-        norm_cfg=dict(type='BN2d'),
-        act_cfg=dict(type='ReLU'),
-        pool_mode='max').cuda()
+        norm_cfg=dict(type="BN2d"),
+        act_cfg=dict(type="ReLU"),
+        pool_mode="max",
+    ).cuda()
 
     assert self.mlps[0].layer0.conv.in_channels == 18
     assert self.mlps[0].layer0.conv.out_channels == 64
 
-    xyz = np.fromfile('tests/data/sunrgbd/points/000001.bin', np.float32)
+    xyz = np.fromfile("tests/data/sunrgbd/points/000001.bin", np.float32)
 
     # (B, N, C)
     xyz = torch.from_numpy(xyz).view(1, -1, 3).cuda()
@@ -36,11 +37,12 @@ def test_dgcnn_gf_module():
     self = DGCNNGFModule(
         mlp_channels=[6, 64, 64],
         num_sample=20,
-        knn_mode='F-KNN',
+        knn_mode="F-KNN",
         radius=None,
-        norm_cfg=dict(type='BN2d'),
-        act_cfg=dict(type='ReLU'),
-        pool_mode='max').cuda()
+        norm_cfg=dict(type="BN2d"),
+        act_cfg=dict(type="ReLU"),
+        pool_mode="max",
+    ).cuda()
 
     # test forward
     new_points = self(xyz)
@@ -50,8 +52,9 @@ def test_dgcnn_gf_module():
     self = DGCNNGFModule(
         mlp_channels=[6, 64, 64],
         num_sample=20,
-        knn_mode='F-KNN',
+        knn_mode="F-KNN",
         radius=0.2,
-        norm_cfg=dict(type='BN2d'),
-        act_cfg=dict(type='ReLU'),
-        pool_mode='max').cuda()
+        norm_cfg=dict(type="BN2d"),
+        act_cfg=dict(type="ReLU"),
+        pool_mode="max",
+    ).cuda()

@@ -7,7 +7,7 @@ try:
     # import ingroup_indices
 except ImportError:
     ingroup_indices = None
-    print('Can not import ingroup indices')
+    print("Can not import ingroup indices")
 
 ingroup_indices = ingroup_inds_cuda
 

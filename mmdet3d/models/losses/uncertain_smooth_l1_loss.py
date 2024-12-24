@@ -2,19 +2,16 @@
 from typing import Optional
 
 import torch
+from mmdet3d.registry import MODELS
 from mmdet.models.losses.utils import weighted_loss
 from torch import Tensor
 from torch import nn as nn
 
-from mmdet3d.registry import MODELS
-
 
 @weighted_loss
-def uncertain_smooth_l1_loss(pred: Tensor,
-                             target: Tensor,
-                             sigma: Tensor,
-                             alpha: float = 1.0,
-                             beta: float = 1.0) -> Tensor:
+def uncertain_smooth_l1_loss(
+    pred: Tensor, target: Tensor, sigma: Tensor, alpha: float = 1.0, beta: float = 1.0
+) -> Tensor:
     """Smooth L1 loss with uncertainty.
 
     Args:
@@ -31,22 +28,22 @@ def uncertain_smooth_l1_loss(pred: Tensor,
     """
     assert beta > 0
     assert target.numel() > 0
-    assert pred.size() == target.size() == sigma.size(), 'The size of pred ' \
-        f'{pred.size()}, target {target.size()}, and sigma {sigma.size()} ' \
-        'are inconsistent.'
+    assert pred.size() == target.size() == sigma.size(), (
+        "The size of pred "
+        f"{pred.size()}, target {target.size()}, and sigma {sigma.size()} "
+        "are inconsistent."
+    )
     diff = torch.abs(pred - target)
-    loss = torch.where(diff < beta, 0.5 * diff * diff / beta,
-                       diff - 0.5 * beta)
+    loss = torch.where(diff < beta, 0.5 * diff * diff / beta, diff - 0.5 * beta)
     loss = torch.exp(-sigma) * loss + alpha * sigma
 
     return loss
 
 
 @weighted_loss
-def uncertain_l1_loss(pred: Tensor,
-                      target: Tensor,
-                      sigma: Tensor,
-                      alpha: float = 1.0) -> Tensor:
+def uncertain_l1_loss(
+    pred: Tensor, target: Tensor, sigma: Tensor, alpha: float = 1.0
+) -> Tensor:
     """L1 loss with uncertainty.
 
     Args:
@@ -60,9 +57,11 @@ def uncertain_l1_loss(pred: Tensor,
         Tensor: Calculated loss
     """
     assert target.numel() > 0
-    assert pred.size() == target.size() == sigma.size(), 'The size of pred ' \
-        f'{pred.size()}, target {target.size()}, and sigma {sigma.size()} ' \
-        'are inconsistent.'
+    assert pred.size() == target.size() == sigma.size(), (
+        "The size of pred "
+        f"{pred.size()}, target {target.size()}, and sigma {sigma.size()} "
+        "are inconsistent."
+    )
     loss = torch.abs(pred - target)
     loss = torch.exp(-sigma) * loss + alpha * sigma
     return loss
@@ -86,26 +85,30 @@ class UncertainSmoothL1Loss(nn.Module):
         loss_weight (float): The weight of loss. Defaults to 1.0
     """
 
-    def __init__(self,
-                 alpha: float = 1.0,
-                 beta: float = 1.0,
-                 reduction: str = 'mean',
-                 loss_weight: float = 1.0) -> None:
+    def __init__(
+        self,
+        alpha: float = 1.0,
+        beta: float = 1.0,
+        reduction: str = "mean",
+        loss_weight: float = 1.0,
+    ) -> None:
         super(UncertainSmoothL1Loss, self).__init__()
-        assert reduction in ['none', 'sum', 'mean']
+        assert reduction in ["none", "sum", "mean"]
         self.alpha = alpha
         self.beta = beta
         self.reduction = reduction
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred: Tensor,
-                target: Tensor,
-                sigma: Tensor,
-                weight: Optional[Tensor] = None,
-                avg_factor: Optional[float] = None,
-                reduction_override: Optional[str] = None,
-                **kwargs) -> Tensor:
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        sigma: Tensor,
+        weight: Optional[Tensor] = None,
+        avg_factor: Optional[float] = None,
+        reduction_override: Optional[str] = None,
+        **kwargs,
+    ) -> Tensor:
         """Forward function.
 
         Args:
@@ -123,9 +126,8 @@ class UncertainSmoothL1Loss(nn.Module):
         Returns:
             Tensor: Calculated loss
         """
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
         loss_bbox = self.loss_weight * uncertain_smooth_l1_loss(
             pred,
             target,
@@ -135,7 +137,8 @@ class UncertainSmoothL1Loss(nn.Module):
             beta=self.beta,
             reduction=reduction,
             avg_factor=avg_factor,
-            **kwargs)
+            **kwargs,
+        )
         return loss_bbox
 
 
@@ -151,23 +154,24 @@ class UncertainL1Loss(nn.Module):
         loss_weight (float): The weight of loss. Defaults to 1.0.
     """
 
-    def __init__(self,
-                 alpha: float = 1.0,
-                 reduction: str = 'mean',
-                 loss_weight: float = 1.0) -> None:
+    def __init__(
+        self, alpha: float = 1.0, reduction: str = "mean", loss_weight: float = 1.0
+    ) -> None:
         super(UncertainL1Loss, self).__init__()
-        assert reduction in ['none', 'sum', 'mean']
+        assert reduction in ["none", "sum", "mean"]
         self.alpha = alpha
         self.reduction = reduction
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred: Tensor,
-                target: Tensor,
-                sigma: Tensor,
-                weight: Optional[Tensor] = None,
-                avg_factor: Optional[float] = None,
-                reduction_override: Optional[str] = None) -> Tensor:
+    def forward(
+        self,
+        pred: Tensor,
+        target: Tensor,
+        sigma: Tensor,
+        weight: Optional[Tensor] = None,
+        avg_factor: Optional[float] = None,
+        reduction_override: Optional[str] = None,
+    ) -> Tensor:
         """Forward function.
 
         Args:
@@ -185,9 +189,8 @@ class UncertainL1Loss(nn.Module):
         Returns:
             Tensor: Calculated loss
         """
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
         loss_bbox = self.loss_weight * uncertain_l1_loss(
             pred,
             target,
@@ -195,5 +198,6 @@ class UncertainL1Loss(nn.Module):
             sigma=sigma,
             alpha=self.alpha,
             reduction=reduction,
-            avg_factor=avg_factor)
+            avg_factor=avg_factor,
+        )
         return loss_bbox

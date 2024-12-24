@@ -4,6 +4,7 @@ from typing import Union
 
 from mmdet3d.registry import MODELS
 from mmdet3d.utils import ConfigType, OptConfigType, OptMultiConfig
+
 from ...structures.det3d_data_sample import SampleList
 from .base import Base3DDetector
 
@@ -28,7 +29,8 @@ class TwoStage3DDetector(Base3DDetector):
         data_preprocessor: OptConfigType = None,
     ) -> None:
         super(TwoStage3DDetector, self).__init__(
-            data_preprocessor=data_preprocessor, init_cfg=init_cfg)
+            data_preprocessor=data_preprocessor, init_cfg=init_cfg
+        )
         self.backbone = MODELS.build(backbone)
 
         if neck is not None:
@@ -38,7 +40,7 @@ class TwoStage3DDetector(Base3DDetector):
             rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
             rpn_head_ = rpn_head.copy()
             rpn_head_.update(train_cfg=rpn_train_cfg, test_cfg=test_cfg.rpn)
-            rpn_head_num_classes = rpn_head_.get('num_classes', None)
+            rpn_head_num_classes = rpn_head_.get("num_classes", None)
             if rpn_head_num_classes is None:
                 rpn_head_.update(num_classes=1)
             self.rpn_head = MODELS.build(rpn_head_)
@@ -56,15 +58,16 @@ class TwoStage3DDetector(Base3DDetector):
     @property
     def with_rpn(self) -> bool:
         """bool: whether the detector has RPN"""
-        return hasattr(self, 'rpn_head') and self.rpn_head is not None
+        return hasattr(self, "rpn_head") and self.rpn_head is not None
 
     @property
     def with_roi_head(self) -> bool:
         """bool: whether the detector has a RoI head"""
-        return hasattr(self, 'roi_head') and self.roi_head is not None
+        return hasattr(self, "roi_head") and self.roi_head is not None
 
-    def loss(self, batch_inputs_dict: dict, batch_data_samples: SampleList,
-             **kwargs) -> Union[dict, list]:
+    def loss(
+        self, batch_inputs_dict: dict, batch_data_samples: SampleList, **kwargs
+    ) -> Union[dict, list]:
         """Calculate losses from a batch of inputs and data samples.
 
         Args:
@@ -87,39 +90,38 @@ class TwoStage3DDetector(Base3DDetector):
 
         # RPN forward and loss
         if self.with_rpn:
-            proposal_cfg = self.train_cfg.get('rpn_proposal',
-                                              self.test_cfg.rpn)
+            proposal_cfg = self.train_cfg.get("rpn_proposal", self.test_cfg.rpn)
             rpn_data_samples = copy.deepcopy(batch_data_samples)
 
             rpn_losses, rpn_results_list = self.rpn_head.loss_and_predict(
-                feats_dict,
-                rpn_data_samples,
-                proposal_cfg=proposal_cfg,
-                **kwargs)
+                feats_dict, rpn_data_samples, proposal_cfg=proposal_cfg, **kwargs
+            )
             # avoid get same name with roi_head loss
             keys = rpn_losses.keys()
             for key in keys:
-                if 'loss' in key and 'rpn' not in key:
-                    losses[f'rpn_{key}'] = rpn_losses[key]
+                if "loss" in key and "rpn" not in key:
+                    losses[f"rpn_{key}"] = rpn_losses[key]
                 else:
                     losses[key] = rpn_losses[key]
         else:
             # TODO: Not support currently, should have a check at Fast R-CNN
-            assert batch_data_samples[0].get('proposals', None) is not None
+            assert batch_data_samples[0].get("proposals", None) is not None
             # use pre-defined proposals in InstanceData for the second stage
             # to extract ROI features.
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
 
-        roi_losses = self.roi_head.loss(feats_dict, rpn_results_list,
-                                        batch_data_samples, **kwargs)
+        roi_losses = self.roi_head.loss(
+            feats_dict, rpn_results_list, batch_data_samples, **kwargs
+        )
         losses.update(roi_losses)
 
         return losses
 
-    def predict(self, batch_inputs_dict: dict, batch_data_samples: SampleList,
-                **kwargs) -> SampleList:
+    def predict(
+        self, batch_inputs_dict: dict, batch_data_samples: SampleList, **kwargs
+    ) -> SampleList:
         """Predict results from a batch of inputs and data samples with post-
         processing.
 
@@ -150,25 +152,25 @@ class TwoStage3DDetector(Base3DDetector):
         feats_dict = self.extract_feat(batch_inputs_dict)
 
         if self.with_rpn:
-            rpn_results_list = self.rpn_head.predict(feats_dict,
-                                                     batch_data_samples)
+            rpn_results_list = self.rpn_head.predict(feats_dict, batch_data_samples)
 
         else:
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
 
-        results_list = self.roi_head.predict(feats_dict, rpn_results_list,
-                                             batch_data_samples)
+        results_list = self.roi_head.predict(
+            feats_dict, rpn_results_list, batch_data_samples
+        )
 
         # connvert to Det3DDataSample
-        results_list = self.add_pred_to_datasample(batch_data_samples,
-                                                   results_list)
+        results_list = self.add_pred_to_datasample(batch_data_samples, results_list)
 
         return results_list
 
-    def _forward(self, batch_inputs_dict: dict, batch_data_samples: SampleList,
-                 **kwargs) -> tuple:
+    def _forward(
+        self, batch_inputs_dict: dict, batch_data_samples: SampleList, **kwargs
+    ) -> tuple:
         """Network forward process. Usually includes backbone, neck and head
         forward without any post-processing.
 
@@ -188,15 +190,16 @@ class TwoStage3DDetector(Base3DDetector):
             forward.
         """
         feats_dict = self.extract_feat(batch_inputs_dict)
-        rpn_outs = self.rpn_head.forward(feats_dict['neck_feats'])
+        rpn_outs = self.rpn_head.forward(feats_dict["neck_feats"])
 
         # If there are no pre-defined proposals, use RPN to get proposals
-        if batch_data_samples[0].get('proposals', None) is None:
+        if batch_data_samples[0].get("proposals", None) is None:
             batch_input_metas = [
                 data_samples.metainfo for data_samples in batch_data_samples
             ]
             rpn_results_list = self.rpn_head.predict_by_feat(
-                *rpn_outs, batch_input_metas=batch_input_metas)
+                *rpn_outs, batch_input_metas=batch_input_metas
+            )
         else:
             # TODO: Not checked currently.
             rpn_results_list = [

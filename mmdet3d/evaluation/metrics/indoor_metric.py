@@ -3,13 +3,12 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Sequence, Union
 
 import numpy as np
-from mmdet.evaluation import eval_map
-from mmengine.evaluator import BaseMetric
-from mmengine.logging import MMLogger
-
 from mmdet3d.evaluation import indoor_eval
 from mmdet3d.registry import METRICS
 from mmdet3d.structures import get_box_type
+from mmdet.evaluation import eval_map
+from mmengine.evaluator import BaseMetric
+from mmengine.logging import MMLogger
 
 
 @METRICS.register_module()
@@ -28,12 +27,13 @@ class IndoorMetric(BaseMetric):
             be used instead. Defaults to None.
     """
 
-    def __init__(self,
-                 iou_thr: List[float] = [0.25, 0.5],
-                 collect_device: str = 'cpu',
-                 prefix: Optional[str] = None) -> None:
-        super(IndoorMetric, self).__init__(
-            prefix=prefix, collect_device=collect_device)
+    def __init__(
+        self,
+        iou_thr: List[float] = [0.25, 0.5],
+        collect_device: str = "cpu",
+        prefix: Optional[str] = None,
+    ) -> None:
+        super(IndoorMetric, self).__init__(prefix=prefix, collect_device=collect_device)
         self.iou_thr = [iou_thr] if isinstance(iou_thr, float) else iou_thr
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
@@ -47,12 +47,12 @@ class IndoorMetric(BaseMetric):
             data_samples (Sequence[dict]): A batch of outputs from the model.
         """
         for data_sample in data_samples:
-            pred_3d = data_sample['pred_instances_3d']
-            eval_ann_info = data_sample['eval_ann_info']
+            pred_3d = data_sample["pred_instances_3d"]
+            eval_ann_info = data_sample["eval_ann_info"]
             cpu_pred_3d = dict()
             for k, v in pred_3d.items():
-                if hasattr(v, 'to'):
-                    cpu_pred_3d[k] = v.to('cpu')
+                if hasattr(v, "to"):
+                    cpu_pred_3d[k] = v.to("cpu")
                 else:
                     cpu_pred_3d[k] = v
             self.results.append((eval_ann_info, cpu_pred_3d))
@@ -77,15 +77,17 @@ class IndoorMetric(BaseMetric):
 
         # some checkpoints may not record the key "box_type_3d"
         box_type_3d, box_mode_3d = get_box_type(
-            self.dataset_meta.get('box_type_3d', 'depth'))
+            self.dataset_meta.get("box_type_3d", "depth")
+        )
 
         ret_dict = indoor_eval(
             ann_infos,
             pred_results,
             self.iou_thr,
-            self.dataset_meta['classes'],
+            self.dataset_meta["classes"],
             logger=logger,
-            box_mode_3d=box_mode_3d)
+            box_mode_3d=box_mode_3d,
+        )
 
         return ret_dict
 
@@ -106,12 +108,15 @@ class Indoor2DMetric(BaseMetric):
             be used instead. Defaults to None.
     """
 
-    def __init__(self,
-                 iou_thr: Union[float, List[float]] = [0.5],
-                 collect_device: str = 'cpu',
-                 prefix: Optional[str] = None):
+    def __init__(
+        self,
+        iou_thr: Union[float, List[float]] = [0.5],
+        collect_device: str = "cpu",
+        prefix: Optional[str] = None,
+    ):
         super(Indoor2DMetric, self).__init__(
-            prefix=prefix, collect_device=collect_device)
+            prefix=prefix, collect_device=collect_device
+        )
         self.iou_thr = [iou_thr] if isinstance(iou_thr, float) else iou_thr
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
@@ -125,21 +130,23 @@ class Indoor2DMetric(BaseMetric):
             data_samples (Sequence[dict]): A batch of outputs from the model.
         """
         for data_sample in data_samples:
-            pred = data_sample['pred_instances']
-            eval_ann_info = data_sample['eval_ann_info']
+            pred = data_sample["pred_instances"]
+            eval_ann_info = data_sample["eval_ann_info"]
             ann = dict(
-                labels=eval_ann_info['gt_bboxes_labels'],
-                bboxes=eval_ann_info['gt_bboxes'])
+                labels=eval_ann_info["gt_bboxes_labels"],
+                bboxes=eval_ann_info["gt_bboxes"],
+            )
 
-            pred_bboxes = pred['bboxes'].cpu().numpy()
-            pred_scores = pred['scores'].cpu().numpy()
-            pred_labels = pred['labels'].cpu().numpy()
+            pred_bboxes = pred["bboxes"].cpu().numpy()
+            pred_scores = pred["scores"].cpu().numpy()
+            pred_labels = pred["labels"].cpu().numpy()
 
             dets = []
-            for label in range(len(self.dataset_meta['classes'])):
+            for label in range(len(self.dataset_meta["classes"])):
                 index = np.where(pred_labels == label)[0]
                 pred_bbox_scores = np.hstack(
-                    [pred_bboxes[index], pred_scores[index].reshape((-1, 1))])
+                    [pred_bboxes[index], pred_scores[index].reshape((-1, 1))]
+                )
                 dets.append(pred_bbox_scores)
 
             self.results.append((ann, dets))
@@ -163,7 +170,8 @@ class Indoor2DMetric(BaseMetric):
                 annotations,
                 scale_ranges=None,
                 iou_thr=iou_thr_2d_single,
-                dataset=self.dataset_meta['classes'],
-                logger=logger)
-            eval_results['mAP_' + str(iou_thr_2d_single)] = mean_ap
+                dataset=self.dataset_meta["classes"],
+                logger=logger,
+            )
+            eval_results["mAP_" + str(iou_thr_2d_single)] = mean_ap
         return eval_results

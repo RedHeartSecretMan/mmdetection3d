@@ -1,7 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import pytest
 import torch
-
 from mmdet3d.registry import MODELS
 
 
@@ -9,11 +8,12 @@ def test_cylinder3d():
     if not torch.cuda.is_available():
         pytest.skip()
     cfg = dict(
-        type='Asymm3DSpconv',
+        type="Asymm3DSpconv",
         grid_size=[48, 32, 4],
         input_channels=16,
         base_channels=32,
-        norm_cfg=dict(type='BN1d', eps=1e-5, momentum=0.1))
+        norm_cfg=dict(type="BN1d", eps=1e-5, momentum=0.1),
+    )
     self = MODELS.build(cfg)
     self.cuda()
 

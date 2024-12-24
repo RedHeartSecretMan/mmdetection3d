@@ -1,12 +1,12 @@
 from typing import Dict, List, Optional
 
 import torch
-from torch import Tensor
-
 from mmdet3d.models.detectors.mvx_two_stage import MVXTwoStageDetector
 from mmdet3d.registry import MODELS
 from mmdet3d.structures import Det3DDataSample
 from mmdet3d.structures.bbox_3d.utils import get_lidar2img
+from torch import Tensor
+
 from .grid_mask import GridMask
 
 
@@ -33,28 +33,33 @@ class DETR3D(MVXTwoStageDetector):
             model. Defaults to None.
     """
 
-    def __init__(self,
-                 data_preprocessor=None,
-                 use_grid_mask=False,
-                 img_backbone=None,
-                 img_neck=None,
-                 pts_bbox_head=None,
-                 train_cfg=None,
-                 test_cfg=None,
-                 pretrained=None):
+    def __init__(
+        self,
+        data_preprocessor=None,
+        use_grid_mask=False,
+        img_backbone=None,
+        img_neck=None,
+        pts_bbox_head=None,
+        train_cfg=None,
+        test_cfg=None,
+        pretrained=None,
+    ):
         super(DETR3D, self).__init__(
             img_backbone=img_backbone,
             img_neck=img_neck,
             pts_bbox_head=pts_bbox_head,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
-            data_preprocessor=data_preprocessor)
+            data_preprocessor=data_preprocessor,
+        )
         self.grid_mask = GridMask(
-            True, True, rotate=1, offset=False, ratio=0.5, mode=1, prob=0.7)
+            True, True, rotate=1, offset=False, ratio=0.5, mode=1, prob=0.7
+        )
         self.use_grid_mask = use_grid_mask
 
-    def extract_img_feat(self, img: Tensor,
-                         batch_input_metas: List[dict]) -> List[Tensor]:
+    def extract_img_feat(
+        self, img: Tensor, batch_input_metas: List[dict]
+    ) -> List[Tensor]:
         """Extract features from images.
 
         Args:
@@ -95,23 +100,27 @@ class DETR3D(MVXTwoStageDetector):
             img_feats_reshaped.append(img_feat.view(B, int(BN / B), C, H, W))
         return img_feats_reshaped
 
-    def extract_feat(self, batch_inputs_dict: Dict,
-                     batch_input_metas: List[dict]) -> List[Tensor]:
+    def extract_feat(
+        self, batch_inputs_dict: Dict, batch_input_metas: List[dict]
+    ) -> List[Tensor]:
         """Extract features from images.
 
         Refer to self.extract_img_feat()
         """
-        imgs = batch_inputs_dict.get('imgs', None)
+        imgs = batch_inputs_dict.get("imgs", None)
         img_feats = self.extract_img_feat(imgs, batch_input_metas)
         return img_feats
 
     def _forward(self):
-        raise NotImplementedError('tensor mode is yet to add')
+        raise NotImplementedError("tensor mode is yet to add")
 
     # original forward_train
-    def loss(self, batch_inputs_dict: Dict[List, Tensor],
-             batch_data_samples: List[Det3DDataSample],
-             **kwargs) -> List[Det3DDataSample]:
+    def loss(
+        self,
+        batch_inputs_dict: Dict[List, Tensor],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """
         Args:
             batch_inputs_dict (dict): The model input dict which include
@@ -130,18 +139,19 @@ class DETR3D(MVXTwoStageDetector):
         img_feats = self.extract_feat(batch_inputs_dict, batch_input_metas)
         outs = self.pts_bbox_head(img_feats, batch_input_metas, **kwargs)
 
-        batch_gt_instances_3d = [
-            item.gt_instances_3d for item in batch_data_samples
-        ]
+        batch_gt_instances_3d = [item.gt_instances_3d for item in batch_data_samples]
         loss_inputs = [batch_gt_instances_3d, outs]
         losses_pts = self.pts_bbox_head.loss_by_feat(*loss_inputs)
 
         return losses_pts
 
     # original simple_test
-    def predict(self, batch_inputs_dict: Dict[str, Optional[Tensor]],
-                batch_data_samples: List[Det3DDataSample],
-                **kwargs) -> List[Det3DDataSample]:
+    def predict(
+        self,
+        batch_inputs_dict: Dict[str, Optional[Tensor]],
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ) -> List[Det3DDataSample]:
         """Forward of testing.
 
         Args:
@@ -173,11 +183,11 @@ class DETR3D(MVXTwoStageDetector):
         outs = self.pts_bbox_head(img_feats, batch_input_metas)
 
         results_list_3d = self.pts_bbox_head.predict_by_feat(
-            outs, batch_input_metas, **kwargs)
+            outs, batch_input_metas, **kwargs
+        )
 
         # change the bboxes' format
-        detsamples = self.add_pred_to_datasample(batch_data_samples,
-                                                 results_list_3d)
+        detsamples = self.add_pred_to_datasample(batch_data_samples, results_list_3d)
         return detsamples
 
     # may need speed-up
@@ -193,9 +203,9 @@ class DETR3D(MVXTwoStageDetector):
         """
         for meta in batch_input_metas:
             l2i = list()
-            for i in range(len(meta['cam2img'])):
-                c2i = torch.tensor(meta['cam2img'][i]).double()
-                l2c = torch.tensor(meta['lidar2cam'][i]).double()
+            for i in range(len(meta["cam2img"])):
+                c2i = torch.tensor(meta["cam2img"][i]).double()
+                l2c = torch.tensor(meta["lidar2cam"][i]).double()
                 l2i.append(get_lidar2img(c2i, l2c).float().numpy())
-            meta['lidar2img'] = l2i
+            meta["lidar2img"] = l2i
         return batch_input_metas

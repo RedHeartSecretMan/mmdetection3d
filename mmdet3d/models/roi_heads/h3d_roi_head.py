@@ -1,11 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, List
 
+from mmdet3d.registry import MODELS
+from mmdet3d.structures import Det3DDataSample
 from mmengine.structures import InstanceData
 from torch import Tensor
 
-from mmdet3d.registry import MODELS
-from mmdet3d.structures import Det3DDataSample
 from .base_3droi_head import Base3DRoIHead
 
 
@@ -20,17 +20,20 @@ class H3DRoIHead(Base3DRoIHead):
         test_cfg (ConfigDict): Testing config.
     """
 
-    def __init__(self,
-                 primitive_list: List[dict],
-                 bbox_head: dict = None,
-                 train_cfg: dict = None,
-                 test_cfg: dict = None,
-                 init_cfg: dict = None):
+    def __init__(
+        self,
+        primitive_list: List[dict],
+        bbox_head: dict = None,
+        train_cfg: dict = None,
+        test_cfg: dict = None,
+        init_cfg: dict = None,
+    ):
         super(H3DRoIHead, self).__init__(
             bbox_head=bbox_head,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
-            init_cfg=init_cfg)
+            init_cfg=init_cfg,
+        )
         # Primitive module
         assert len(primitive_list) == 3
         self.primitive_z = MODELS.build(primitive_list[0])
@@ -50,16 +53,21 @@ class H3DRoIHead(Base3DRoIHead):
                 the interface in base class
             bbox_head (dict): Config for bbox head.
         """
-        bbox_head['train_cfg'] = self.train_cfg
-        bbox_head['test_cfg'] = self.test_cfg
+        bbox_head["train_cfg"] = self.train_cfg
+        bbox_head["test_cfg"] = self.test_cfg
         self.bbox_head = MODELS.build(bbox_head)
 
     def init_assigner_sampler(self):
         """Initialize assigner and sampler."""
         pass
 
-    def loss(self, points: List[Tensor], feats_dict: dict,
-             batch_data_samples: List[Det3DDataSample], **kwargs):
+    def loss(
+        self,
+        points: List[Tensor],
+        feats_dict: dict,
+        batch_data_samples: List[Det3DDataSample],
+        **kwargs
+    ):
         """Training forward function of PartAggregationROIHead.
 
         Args:
@@ -84,22 +92,25 @@ class H3DRoIHead(Base3DRoIHead):
         losses.update(loss_xy)
         losses.update(loss_line)
 
-        targets = feats_dict.pop('targets')
+        targets = feats_dict.pop("targets")
 
         bbox_loss = self.bbox_head.loss(
             points,
             feats_dict,
             rpn_targets=targets,
-            batch_data_samples=batch_data_samples)
+            batch_data_samples=batch_data_samples,
+        )
         losses.update(bbox_loss)
         return losses
 
-    def predict(self,
-                points: List[Tensor],
-                feats_dict: Dict[str, Tensor],
-                batch_data_samples: List[Det3DDataSample],
-                suffix='_optimized',
-                **kwargs) -> List[InstanceData]:
+    def predict(
+        self,
+        points: List[Tensor],
+        feats_dict: Dict[str, Tensor],
+        batch_data_samples: List[Det3DDataSample],
+        suffix="_optimized",
+        **kwargs
+    ) -> List[InstanceData]:
         """
         Args:
             points (list[tensor]): Point clouds of multiple samples.
@@ -125,6 +136,7 @@ class H3DRoIHead(Base3DRoIHead):
         bbox_preds = self.bbox_head(feats_dict)
         feats_dict.update(bbox_preds)
         results_list = self.bbox_head.predict(
-            points, feats_dict, batch_data_samples, suffix=suffix)
+            points, feats_dict, batch_data_samples, suffix=suffix
+        )
 
         return results_list

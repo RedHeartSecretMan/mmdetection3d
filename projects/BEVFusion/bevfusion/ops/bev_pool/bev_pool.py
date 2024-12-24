@@ -24,7 +24,7 @@ class QuickCumsum(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, gradx, gradgeom):
-        (kept, ) = ctx.saved_tensors
+        (kept,) = ctx.saved_tensors
         back = torch.cumsum(kept, 0)
         back[kept] -= 1
 
@@ -84,8 +84,11 @@ def bev_pool(feats, coords, B, D, H, W):
     assert feats.shape[0] == coords.shape[0]
 
     ranks = (
-        coords[:, 0] * (W * D * B) + coords[:, 1] * (D * B) +
-        coords[:, 2] * B + coords[:, 3])
+        coords[:, 0] * (W * D * B)
+        + coords[:, 1] * (D * B)
+        + coords[:, 2] * B
+        + coords[:, 3]
+    )
     indices = ranks.argsort()
     feats, coords, ranks = feats[indices], coords[indices], ranks[indices]
 

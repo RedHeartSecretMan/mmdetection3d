@@ -1,7 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
 import torch
-
 from mmdet3d.structures.bbox_3d.utils import limit_period
 
 
@@ -20,11 +19,12 @@ def normalize_bbox(bboxes, pc_range):
         vx = bboxes[..., 7:8]
         vy = bboxes[..., 8:9]
         normalized_bboxes = torch.cat(
-            (cx, cy, length, width, cz, height, rot.sin(), rot.cos(), vx, vy),
-            dim=-1)
+            (cx, cy, length, width, cz, height, rot.sin(), rot.cos(), vx, vy), dim=-1
+        )
     else:
         normalized_bboxes = torch.cat(
-            (cx, cy, length, width, cz, height, rot.sin(), rot.cos()), dim=-1)
+            (cx, cy, length, width, cz, height, rot.sin(), rot.cos()), dim=-1
+        )
     return normalized_bboxes
 
 
@@ -55,9 +55,11 @@ def denormalize_bbox(normalized_bboxes, pc_range):
         vx = normalized_bboxes[:, 8:9]
         vy = normalized_bboxes[:, 9:10]
         denormalized_bboxes = torch.cat(
-            [cx, cy, cz, length, width, height, rot, vx, vy], dim=-1)
+            [cx, cy, cz, length, width, height, rot, vx, vy], dim=-1
+        )
     else:
         denormalized_bboxes = torch.cat(
-            [cx, cy, cz, length, width, height, rot], dim=-1)
+            [cx, cy, cz, length, width, height, rot], dim=-1
+        )
 
     return denormalized_bboxes

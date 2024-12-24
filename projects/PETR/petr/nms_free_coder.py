@@ -9,9 +9,8 @@
 # ------------------------------------------------------------------------
 import torch
 import torch.nn.functional as F
-from mmdet.models.task_modules import BaseBBoxCoder
-
 from mmdet3d.registry import TASK_UTILS
+from mmdet.models.task_modules import BaseBBoxCoder
 from projects.PETR.petr.utils import denormalize_bbox
 
 
@@ -29,13 +28,15 @@ class NMSFreeCoder(BaseBBoxCoder):
         code_size (int): Code size of bboxes. Default: 9
     """
 
-    def __init__(self,
-                 pc_range,
-                 voxel_size=None,
-                 post_center_range=None,
-                 max_num=100,
-                 score_threshold=None,
-                 num_classes=10):
+    def __init__(
+        self,
+        pc_range,
+        voxel_size=None,
+        post_center_range=None,
+        max_num=100,
+        score_threshold=None,
+        num_classes=10,
+    ):
 
         self.pc_range = pc_range
         self.voxel_size = voxel_size
@@ -78,12 +79,11 @@ class NMSFreeCoder(BaseBBoxCoder):
             thresh_mask = final_scores > self.score_threshold
         if self.post_center_range is not None:
             self.post_center_range = torch.tensor(
-                self.post_center_range, device=scores.device)
+                self.post_center_range, device=scores.device
+            )
 
-            mask = (final_box_preds[..., :3] >=
-                    self.post_center_range[:3]).all(1)
-            mask &= (final_box_preds[..., :3] <=
-                     self.post_center_range[3:]).all(1)
+            mask = (final_box_preds[..., :3] >= self.post_center_range[:3]).all(1)
+            mask &= (final_box_preds[..., :3] <= self.post_center_range[3:]).all(1)
 
             if self.score_threshold:
                 mask &= thresh_mask
@@ -91,16 +91,13 @@ class NMSFreeCoder(BaseBBoxCoder):
             boxes3d = final_box_preds[mask]
             scores = final_scores[mask]
             labels = final_preds[mask]
-            predictions_dict = {
-                'bboxes': boxes3d,
-                'scores': scores,
-                'labels': labels
-            }
+            predictions_dict = {"bboxes": boxes3d, "scores": scores, "labels": labels}
 
         else:
             raise NotImplementedError(
-                'Need to reorganize output as a batch, only '
-                'support post_center_range is not None for now!')
+                "Need to reorganize output as a batch, only "
+                "support post_center_range is not None for now!"
+            )
         return predictions_dict
 
     def decode(self, preds_dicts):
@@ -117,14 +114,15 @@ class NMSFreeCoder(BaseBBoxCoder):
         Returns:
             list[dict]: Decoded boxes.
         """
-        all_cls_scores = preds_dicts['all_cls_scores'][-1]
-        all_bbox_preds = preds_dicts['all_bbox_preds'][-1]
+        all_cls_scores = preds_dicts["all_cls_scores"][-1]
+        all_bbox_preds = preds_dicts["all_bbox_preds"][-1]
 
         batch_size = all_cls_scores.size()[0]
         predictions_list = []
         for i in range(batch_size):
             predictions_list.append(
-                self.decode_single(all_cls_scores[i], all_bbox_preds[i]))
+                self.decode_single(all_cls_scores[i], all_bbox_preds[i])
+            )
         return predictions_list
 
 
@@ -142,13 +140,15 @@ class NMSFreeClsCoder(BaseBBoxCoder):
         code_size (int): Code size of bboxes. Default: 9
     """
 
-    def __init__(self,
-                 pc_range,
-                 voxel_size=None,
-                 post_center_range=None,
-                 max_num=100,
-                 score_threshold=None,
-                 num_classes=10):
+    def __init__(
+        self,
+        pc_range,
+        voxel_size=None,
+        post_center_range=None,
+        max_num=100,
+        score_threshold=None,
+        num_classes=10,
+    ):
 
         self.pc_range = pc_range
         self.voxel_size = voxel_size
@@ -196,12 +196,11 @@ class NMSFreeClsCoder(BaseBBoxCoder):
             thresh_mask = final_scores > self.score_threshold
         if self.post_center_range is not None:
             self.post_center_range = torch.tensor(
-                self.post_center_range, device=scores.device)
+                self.post_center_range, device=scores.device
+            )
 
-            mask = (final_box_preds[..., :3] >=
-                    self.post_center_range[:3]).all(1)
-            mask &= (final_box_preds[..., :3] <=
-                     self.post_center_range[3:]).all(1)
+            mask = (final_box_preds[..., :3] >= self.post_center_range[:3]).all(1)
+            mask &= (final_box_preds[..., :3] <= self.post_center_range[3:]).all(1)
 
             if self.score_threshold:
                 mask &= thresh_mask
@@ -209,16 +208,13 @@ class NMSFreeClsCoder(BaseBBoxCoder):
             boxes3d = final_box_preds[mask]
             scores = final_scores[mask]
             labels = final_preds[mask]
-            predictions_dict = {
-                'bboxes': boxes3d,
-                'scores': scores,
-                'labels': labels
-            }
+            predictions_dict = {"bboxes": boxes3d, "scores": scores, "labels": labels}
 
         else:
             raise NotImplementedError(
-                'Need to reorganize output as a batch, only '
-                'support post_center_range is not None for now!')
+                "Need to reorganize output as a batch, only "
+                "support post_center_range is not None for now!"
+            )
         return predictions_dict
 
     def decode(self, preds_dicts):
@@ -235,12 +231,13 @@ class NMSFreeClsCoder(BaseBBoxCoder):
         Returns:
             list[dict]: Decoded boxes.
         """
-        all_cls_scores = preds_dicts['all_cls_scores'][-1]
-        all_bbox_preds = preds_dicts['all_bbox_preds'][-1]
+        all_cls_scores = preds_dicts["all_cls_scores"][-1]
+        all_bbox_preds = preds_dicts["all_bbox_preds"][-1]
 
         batch_size = all_cls_scores.size()[0]
         predictions_list = []
         for i in range(batch_size):
             predictions_list.append(
-                self.decode_single(all_cls_scores[i], all_bbox_preds[i]))
+                self.decode_single(all_cls_scores[i], all_bbox_preds[i])
+            )
         return predictions_list

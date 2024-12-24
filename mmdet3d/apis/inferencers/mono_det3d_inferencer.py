@@ -5,14 +5,13 @@ from typing import Dict, List, Optional, Sequence, Union
 import mmcv
 import mmengine
 import numpy as np
+from mmdet3d.registry import INFERENCERS
+from mmdet3d.utils import ConfigType
 from mmengine.dataset import Compose
-from mmengine.fileio import (get_file_backend, isdir, join_path,
-                             list_dir_or_file)
+from mmengine.fileio import get_file_backend, isdir, join_path, list_dir_or_file
 from mmengine.infer.infer import ModelType
 from mmengine.structures import InstanceData
 
-from mmdet3d.registry import INFERENCERS
-from mmdet3d.utils import ConfigType
 from .base_3d_inferencer import Base3DInferencer
 
 InstanceList = List[InstanceData]
@@ -23,7 +22,7 @@ ImgType = Union[np.ndarray, Sequence[np.ndarray]]
 ResType = Union[Dict, List[Dict], InstanceData, List[InstanceData]]
 
 
-@INFERENCERS.register_module(name='det3d-mono')
+@INFERENCERS.register_module(name="det3d-mono")
 @INFERENCERS.register_module()
 class MonoDet3DInferencer(Base3DInferencer):
     """MMDet3D Monocular 3D object detection inferencer.
@@ -46,26 +45,24 @@ class MonoDet3DInferencer(Base3DInferencer):
             priority is palette -> config -> checkpoint. Defaults to 'none'.
     """
 
-    def __init__(self,
-                 model: Union[ModelType, str, None] = None,
-                 weights: Optional[str] = None,
-                 device: Optional[str] = None,
-                 scope: str = 'mmdet3d',
-                 palette: str = 'none') -> None:
+    def __init__(
+        self,
+        model: Union[ModelType, str, None] = None,
+        weights: Optional[str] = None,
+        device: Optional[str] = None,
+        scope: str = "mmdet3d",
+        palette: str = "none",
+    ) -> None:
         # A global counter tracking the number of images processed, for
         # naming of the output images
         self.num_visualized_imgs = 0
         super(MonoDet3DInferencer, self).__init__(
-            model=model,
-            weights=weights,
-            device=device,
-            scope=scope,
-            palette=palette)
+            model=model, weights=weights, device=device, scope=scope, palette=palette
+        )
 
-    def _inputs_to_list(self,
-                        inputs: Union[dict, list],
-                        cam_type='CAM2',
-                        **kwargs) -> list:
+    def _inputs_to_list(
+        self, inputs: Union[dict, list], cam_type="CAM2", **kwargs
+    ) -> list:
         """Preprocess the inputs to a list.
 
         Preprocess inputs to a list according to its type:
@@ -84,76 +81,80 @@ class MonoDet3DInferencer(Base3DInferencer):
             list: List of input for the :meth:`preprocess`.
         """
         if isinstance(inputs, dict):
-            assert 'infos' in inputs
-            infos = inputs.pop('infos')
+            assert "infos" in inputs
+            infos = inputs.pop("infos")
 
-            if isinstance(inputs['img'], str):
-                img = inputs['img']
+            if isinstance(inputs["img"], str):
+                img = inputs["img"]
                 backend = get_file_backend(img)
-                if hasattr(backend, 'isdir') and isdir(img):
+                if hasattr(backend, "isdir") and isdir(img):
                     # Backends like HttpsBackend do not implement `isdir`, so
                     # only those backends that implement `isdir` could accept
                     # the inputs as a directory
                     filename_list = list_dir_or_file(img, list_dir=False)
-                    inputs = [{
-                        'img': join_path(img, filename)
-                    } for filename in filename_list]
+                    inputs = [
+                        {"img": join_path(img, filename)} for filename in filename_list
+                    ]
 
             if not isinstance(inputs, (list, tuple)):
                 inputs = [inputs]
 
             # get cam2img, lidar2cam and lidar2img from infos
-            info_list = mmengine.load(infos)['data_list']
+            info_list = mmengine.load(infos)["data_list"]
             assert len(info_list) == len(inputs)
             for index, input in enumerate(inputs):
                 data_info = info_list[index]
-                img_path = data_info['images'][cam_type]['img_path']
-                if isinstance(input['img'], str) and \
-                        osp.basename(img_path) != osp.basename(input['img']):
-                    raise ValueError(
-                        f'the info file of {img_path} is not provided.')
+                img_path = data_info["images"][cam_type]["img_path"]
+                if isinstance(input["img"], str) and osp.basename(
+                    img_path
+                ) != osp.basename(input["img"]):
+                    raise ValueError(f"the info file of {img_path} is not provided.")
                 cam2img = np.asarray(
-                    data_info['images'][cam_type]['cam2img'], dtype=np.float32)
+                    data_info["images"][cam_type]["cam2img"], dtype=np.float32
+                )
                 lidar2cam = np.asarray(
-                    data_info['images'][cam_type]['lidar2cam'],
-                    dtype=np.float32)
-                if 'lidar2img' in data_info['images'][cam_type]:
+                    data_info["images"][cam_type]["lidar2cam"], dtype=np.float32
+                )
+                if "lidar2img" in data_info["images"][cam_type]:
                     lidar2img = np.asarray(
-                        data_info['images'][cam_type]['lidar2img'],
-                        dtype=np.float32)
+                        data_info["images"][cam_type]["lidar2img"], dtype=np.float32
+                    )
                 else:
                     lidar2img = cam2img @ lidar2cam
-                input['cam2img'] = cam2img
-                input['lidar2cam'] = lidar2cam
-                input['lidar2img'] = lidar2img
+                input["cam2img"] = cam2img
+                input["lidar2cam"] = lidar2cam
+                input["lidar2img"] = lidar2img
         elif isinstance(inputs, (list, tuple)):
             # get cam2img, lidar2cam and lidar2img from infos
             for input in inputs:
-                assert 'infos' in input
-                infos = input.pop('infos')
-                info_list = mmengine.load(infos)['data_list']
-                assert len(info_list) == 1, 'Only support single sample info' \
-                    'in `.pkl`, when inputs is a list.'
+                assert "infos" in input
+                infos = input.pop("infos")
+                info_list = mmengine.load(infos)["data_list"]
+                assert len(info_list) == 1, (
+                    "Only support single sample info"
+                    "in `.pkl`, when inputs is a list."
+                )
                 data_info = info_list[0]
-                img_path = data_info['images'][cam_type]['img_path']
-                if isinstance(input['img'], str) and \
-                        osp.basename(img_path) != osp.basename(input['img']):
-                    raise ValueError(
-                        f'the info file of {img_path} is not provided.')
+                img_path = data_info["images"][cam_type]["img_path"]
+                if isinstance(input["img"], str) and osp.basename(
+                    img_path
+                ) != osp.basename(input["img"]):
+                    raise ValueError(f"the info file of {img_path} is not provided.")
                 cam2img = np.asarray(
-                    data_info['images'][cam_type]['cam2img'], dtype=np.float32)
+                    data_info["images"][cam_type]["cam2img"], dtype=np.float32
+                )
                 lidar2cam = np.asarray(
-                    data_info['images'][cam_type]['lidar2cam'],
-                    dtype=np.float32)
-                if 'lidar2img' in data_info['images'][cam_type]:
+                    data_info["images"][cam_type]["lidar2cam"], dtype=np.float32
+                )
+                if "lidar2img" in data_info["images"][cam_type]:
                     lidar2img = np.asarray(
-                        data_info['images'][cam_type]['lidar2img'],
-                        dtype=np.float32)
+                        data_info["images"][cam_type]["lidar2img"], dtype=np.float32
+                    )
                 else:
                     lidar2img = cam2img @ lidar2cam
-                input['cam2img'] = cam2img
-                input['lidar2cam'] = lidar2cam
-                input['lidar2img'] = lidar2img
+                input["cam2img"] = cam2img
+                input["lidar2cam"] = lidar2cam
+                input["lidar2img"] = lidar2img
 
         return list(inputs)
 
@@ -161,25 +162,27 @@ class MonoDet3DInferencer(Base3DInferencer):
         """Initialize the test pipeline."""
         pipeline_cfg = cfg.test_dataloader.dataset.pipeline
 
-        load_img_idx = self._get_transform_idx(pipeline_cfg,
-                                               'LoadImageFromFileMono3D')
+        load_img_idx = self._get_transform_idx(pipeline_cfg, "LoadImageFromFileMono3D")
         if load_img_idx == -1:
             raise ValueError(
-                'LoadImageFromFileMono3D is not found in the test pipeline')
-        pipeline_cfg[load_img_idx]['type'] = 'MonoDet3DInferencerLoader'
+                "LoadImageFromFileMono3D is not found in the test pipeline"
+            )
+        pipeline_cfg[load_img_idx]["type"] = "MonoDet3DInferencerLoader"
         return Compose(pipeline_cfg)
 
-    def visualize(self,
-                  inputs: InputsType,
-                  preds: PredType,
-                  return_vis: bool = False,
-                  show: bool = False,
-                  wait_time: int = 0,
-                  draw_pred: bool = True,
-                  pred_score_thr: float = 0.3,
-                  no_save_vis: bool = False,
-                  img_out_dir: str = '',
-                  cam_type_dir: str = 'CAM2') -> Union[List[np.ndarray], None]:
+    def visualize(
+        self,
+        inputs: InputsType,
+        preds: PredType,
+        return_vis: bool = False,
+        show: bool = False,
+        wait_time: int = 0,
+        draw_pred: bool = True,
+        pred_score_thr: float = 0.3,
+        no_save_vis: bool = False,
+        img_out_dir: str = "",
+        cam_type_dir: str = "CAM2",
+    ) -> Union[List[np.ndarray], None]:
         """Visualize predictions.
 
         Args:
@@ -204,33 +207,39 @@ class MonoDet3DInferencer(Base3DInferencer):
             applicable.
         """
         if no_save_vis is True:
-            img_out_dir = ''
+            img_out_dir = ""
 
-        if not show and img_out_dir == '' and not return_vis:
+        if not show and img_out_dir == "" and not return_vis:
             return None
 
-        if getattr(self, 'visualizer') is None:
-            raise ValueError('Visualization needs the "visualizer" term'
-                             'defined in the config, but got None.')
+        if getattr(self, "visualizer") is None:
+            raise ValueError(
+                'Visualization needs the "visualizer" term'
+                "defined in the config, but got None."
+            )
 
         results = []
 
         for single_input, pred in zip(inputs, preds):
-            if isinstance(single_input['img'], str):
-                img_bytes = mmengine.fileio.get(single_input['img'])
+            if isinstance(single_input["img"], str):
+                img_bytes = mmengine.fileio.get(single_input["img"])
                 img = mmcv.imfrombytes(img_bytes)
                 img = img[:, :, ::-1]
-                img_name = osp.basename(single_input['img'])
-            elif isinstance(single_input['img'], np.ndarray):
-                img = single_input['img'].copy()
+                img_name = osp.basename(single_input["img"])
+            elif isinstance(single_input["img"], np.ndarray):
+                img = single_input["img"].copy()
                 img_num = str(self.num_visualized_imgs).zfill(8)
-                img_name = f'{img_num}.jpg'
+                img_name = f"{img_num}.jpg"
             else:
-                raise ValueError('Unsupported input type: '
-                                 f"{type(single_input['img'])}")
+                raise ValueError(
+                    "Unsupported input type: " f"{type(single_input['img'])}"
+                )
 
-            out_file = osp.join(img_out_dir, 'vis_camera', cam_type_dir,
-                                img_name) if img_out_dir != '' else None
+            out_file = (
+                osp.join(img_out_dir, "vis_camera", cam_type_dir, img_name)
+                if img_out_dir != ""
+                else None
+            )
 
             data_input = dict(img=img)
             self.visualizer.add_datasample(
@@ -243,7 +252,7 @@ class MonoDet3DInferencer(Base3DInferencer):
                 draw_pred=draw_pred,
                 pred_score_thr=pred_score_thr,
                 out_file=out_file,
-                vis_task='mono_det',
+                vis_task="mono_det",
             )
             results.append(img)
             self.num_visualized_imgs += 1

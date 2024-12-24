@@ -5,11 +5,10 @@ from typing import Dict, Optional, Sequence
 
 import mmcv
 import numpy as np
-from mmengine.evaluator import BaseMetric
-from mmengine.logging import MMLogger
-
 from mmdet3d.evaluation import seg_eval
 from mmdet3d.registry import METRICS
+from mmengine.evaluator import BaseMetric
+from mmengine.logging import MMLogger
 
 
 @METRICS.register_module()
@@ -32,16 +31,17 @@ class SegMetric(BaseMetric):
             Default: None.
     """
 
-    def __init__(self,
-                 collect_device: str = 'cpu',
-                 prefix: Optional[str] = None,
-                 pklfile_prefix: str = None,
-                 submission_prefix: str = None,
-                 **kwargs):
+    def __init__(
+        self,
+        collect_device: str = "cpu",
+        prefix: Optional[str] = None,
+        pklfile_prefix: str = None,
+        submission_prefix: str = None,
+        **kwargs,
+    ):
         self.pklfile_prefix = pklfile_prefix
         self.submission_prefix = submission_prefix
-        super(SegMetric, self).__init__(
-            prefix=prefix, collect_device=collect_device)
+        super(SegMetric, self).__init__(prefix=prefix, collect_device=collect_device)
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
         """Process one batch of data samples and predictions.
@@ -56,12 +56,12 @@ class SegMetric(BaseMetric):
                 the model.
         """
         for data_sample in data_samples:
-            pred_3d = data_sample['pred_pts_seg']
-            eval_ann_info = data_sample['eval_ann_info']
+            pred_3d = data_sample["pred_pts_seg"]
+            eval_ann_info = data_sample["eval_ann_info"]
             cpu_pred_3d = dict()
             for k, v in pred_3d.items():
-                if hasattr(v, 'to'):
-                    cpu_pred_3d[k] = v.to('cpu').numpy()
+                if hasattr(v, "to"):
+                    cpu_pred_3d[k] = v.to("cpu").numpy()
                 else:
                     cpu_pred_3d[k] = v
             self.results.append((eval_ann_info, cpu_pred_3d))
@@ -82,23 +82,21 @@ class SegMetric(BaseMetric):
         submission_prefix = self.submission_prefix
         if submission_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
-            submission_prefix = osp.join(tmp_dir.name, 'results')
+            submission_prefix = osp.join(tmp_dir.name, "results")
         mmcv.mkdir_or_exist(submission_prefix)
-        ignore_index = self.dataset_meta['ignore_index']
+        ignore_index = self.dataset_meta["ignore_index"]
         # need to map network output to original label idx
-        cat2label = np.zeros(len(self.dataset_meta['label2cat'])).astype(
-            np.int64)
-        for original_label, output_idx in self.dataset_meta['label2cat'].items(
-        ):
+        cat2label = np.zeros(len(self.dataset_meta["label2cat"])).astype(np.int64)
+        for original_label, output_idx in self.dataset_meta["label2cat"].items():
             if output_idx != ignore_index:
                 cat2label[output_idx] = original_label
 
         for i, (eval_ann, result) in enumerate(results):
-            sample_idx = eval_ann['point_cloud']['lidar_idx']
-            pred_sem_mask = result['semantic_mask'].numpy().astype(np.int64)
+            sample_idx = eval_ann["point_cloud"]["lidar_idx"]
+            pred_sem_mask = result["semantic_mask"].numpy().astype(np.int64)
             pred_label = cat2label[pred_sem_mask]
-            curr_file = f'{submission_prefix}/{sample_idx}.txt'
-            np.savetxt(curr_file, pred_label, fmt='%d')
+            curr_file = f"{submission_prefix}/{sample_idx}.txt"
+            np.savetxt(curr_file, pred_label, fmt="%d")
 
     def compute_metrics(self, results: list) -> Dict[str, float]:
         """Compute the metrics from processed results.
@@ -116,22 +114,22 @@ class SegMetric(BaseMetric):
             self.format_results(results)
             return None
 
-        label2cat = self.dataset_meta['label2cat']
-        ignore_index = self.dataset_meta['ignore_index']
+        label2cat = self.dataset_meta["label2cat"]
+        ignore_index = self.dataset_meta["ignore_index"]
 
         gt_semantic_masks = []
         pred_semantic_masks = []
 
         for eval_ann, sinlge_pred_results in results:
-            gt_semantic_masks.append(eval_ann['pts_semantic_mask'])
-            pred_semantic_masks.append(
-                sinlge_pred_results['pts_semantic_mask'])
+            gt_semantic_masks.append(eval_ann["pts_semantic_mask"])
+            pred_semantic_masks.append(sinlge_pred_results["pts_semantic_mask"])
 
         ret_dict = seg_eval(
             gt_semantic_masks,
             pred_semantic_masks,
             label2cat,
             ignore_index,
-            logger=logger)
+            logger=logger,
+        )
 
         return ret_dict

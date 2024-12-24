@@ -6,12 +6,11 @@ from typing import Callable, List, Optional, Set, Union
 
 import numpy as np
 import torch
+from mmdet3d.registry import DATASETS
+from mmdet3d.structures import get_box_type
 from mmengine.dataset import BaseDataset
 from mmengine.logging import print_log
 from terminaltables import AsciiTable
-
-from mmdet3d.registry import DATASETS
-from mmdet3d.structures import get_box_type
 
 
 @DATASETS.register_module()
@@ -67,25 +66,27 @@ class Det3DDataset(BaseDataset):
             Defaults to False.
     """
 
-    def __init__(self,
-                 data_root: Optional[str] = None,
-                 ann_file: str = '',
-                 metainfo: Optional[dict] = None,
-                 data_prefix: dict = dict(pts='velodyne', img=''),
-                 pipeline: List[Union[dict, Callable]] = [],
-                 modality: dict = dict(use_lidar=True, use_camera=False),
-                 default_cam_key: str = None,
-                 box_type_3d: dict = 'LiDAR',
-                 filter_empty_gt: bool = True,
-                 test_mode: bool = False,
-                 load_eval_anns: bool = True,
-                 backend_args: Optional[dict] = None,
-                 show_ins_var: bool = False,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        data_root: Optional[str] = None,
+        ann_file: str = "",
+        metainfo: Optional[dict] = None,
+        data_prefix: dict = dict(pts="velodyne", img=""),
+        pipeline: List[Union[dict, Callable]] = [],
+        modality: dict = dict(use_lidar=True, use_camera=False),
+        default_cam_key: str = None,
+        box_type_3d: dict = "LiDAR",
+        filter_empty_gt: bool = True,
+        test_mode: bool = False,
+        load_eval_anns: bool = True,
+        backend_args: Optional[dict] = None,
+        show_ins_var: bool = False,
+        **kwargs,
+    ) -> None:
         self.backend_args = backend_args
         self.filter_empty_gt = filter_empty_gt
         self.load_eval_anns = load_eval_anns
-        _default_modality_keys = ('use_lidar', 'use_camera')
+        _default_modality_keys = ("use_lidar", "use_camera")
         if modality is None:
             modality = dict()
 
@@ -95,33 +96,28 @@ class Det3DDataset(BaseDataset):
                 modality[key] = False
         self.modality = modality
         self.default_cam_key = default_cam_key
-        assert self.modality['use_lidar'] or self.modality['use_camera'], (
-            'Please specify the `modality` (`use_lidar` '
-            f', `use_camera`) for {self.__class__.__name__}')
+        assert self.modality["use_lidar"] or self.modality["use_camera"], (
+            "Please specify the `modality` (`use_lidar` "
+            f", `use_camera`) for {self.__class__.__name__}"
+        )
 
         self.box_type_3d, self.box_mode_3d = get_box_type(box_type_3d)
 
-        if metainfo is not None and 'classes' in metainfo:
+        if metainfo is not None and "classes" in metainfo:
             # we allow to train on subset of self.METAINFO['classes']
             # map unselected labels to -1
-            self.label_mapping = {
-                i: -1
-                for i in range(len(self.METAINFO['classes']))
-            }
+            self.label_mapping = {i: -1 for i in range(len(self.METAINFO["classes"]))}
             self.label_mapping[-1] = -1
-            for label_idx, name in enumerate(metainfo['classes']):
-                ori_label = self.METAINFO['classes'].index(name)
+            for label_idx, name in enumerate(metainfo["classes"]):
+                ori_label = self.METAINFO["classes"].index(name)
                 self.label_mapping[ori_label] = label_idx
 
-            self.num_ins_per_cat = [0] * len(metainfo['classes'])
+            self.num_ins_per_cat = [0] * len(metainfo["classes"])
         else:
-            self.label_mapping = {
-                i: i
-                for i in range(len(self.METAINFO['classes']))
-            }
+            self.label_mapping = {i: i for i in range(len(self.METAINFO["classes"]))}
             self.label_mapping[-1] = -1
 
-            self.num_ins_per_cat = [0] * len(self.METAINFO['classes'])
+            self.num_ins_per_cat = [0] * len(self.METAINFO["classes"])
 
         super().__init__(
             ann_file=ann_file,
@@ -130,30 +126,33 @@ class Det3DDataset(BaseDataset):
             data_prefix=data_prefix,
             pipeline=pipeline,
             test_mode=test_mode,
-            **kwargs)
+            **kwargs,
+        )
 
         # can be accessed by other component in runner
-        self.metainfo['box_type_3d'] = box_type_3d
-        self.metainfo['label_mapping'] = self.label_mapping
+        self.metainfo["box_type_3d"] = box_type_3d
+        self.metainfo["label_mapping"] = self.label_mapping
 
-        if not kwargs.get('lazy_init', False):
+        if not kwargs.get("lazy_init", False):
             # used for showing variation of the number of instances before and
             # after through the pipeline
             self.show_ins_var = show_ins_var
 
             # show statistics of this dataset
-            print_log('-' * 30, 'current')
+            print_log("-" * 30, "current")
             print_log(
                 f'The length of {"test" if self.test_mode else "training"} dataset: {len(self)}',  # noqa: E501
-                'current')
-            content_show = [['category', 'number']]
+                "current",
+            )
+            content_show = [["category", "number"]]
             for label, num in enumerate(self.num_ins_per_cat):
-                cat_name = self.metainfo['classes'][label]
+                cat_name = self.metainfo["classes"][label]
                 content_show.append([cat_name, num])
             table = AsciiTable(content_show)
             print_log(
-                f'The number of instances per category in the dataset:\n{table.table}',  # noqa: E501
-                'current')
+                f"The number of instances per category in the dataset:\n{table.table}",  # noqa: E501
+                "current",
+            )
 
     def _remove_dontcare(self, ann_info: dict) -> dict:
         """Remove annotations that do not need to be cared.
@@ -168,10 +167,10 @@ class Det3DDataset(BaseDataset):
             dict: Annotations after filtering.
         """
         img_filtered_annotations = {}
-        filter_mask = ann_info['gt_labels_3d'] > -1
+        filter_mask = ann_info["gt_labels_3d"] > -1
         for key in ann_info.keys():
-            if key != 'instances':
-                img_filtered_annotations[key] = (ann_info[key][filter_mask])
+            if key != "instances":
+                img_filtered_annotations[key] = ann_info[key][filter_mask]
             else:
                 img_filtered_annotations[key] = ann_info[key]
         return img_filtered_annotations
@@ -190,10 +189,10 @@ class Det3DDataset(BaseDataset):
         """
         data_info = self.get_data_info(index)
         # test model
-        if 'ann_info' not in data_info:
+        if "ann_info" not in data_info:
             ann_info = self.parse_ann_info(data_info)
         else:
-            ann_info = data_info['ann_info']
+            ann_info = data_info["ann_info"]
 
         return ann_info
 
@@ -216,16 +215,16 @@ class Det3DDataset(BaseDataset):
         # 2d annotation process is in the `LoadAnnotations3D`
         # in `transforms`
         name_mapping = {
-            'bbox_label_3d': 'gt_labels_3d',
-            'bbox_label': 'gt_bboxes_labels',
-            'bbox': 'gt_bboxes',
-            'bbox_3d': 'gt_bboxes_3d',
-            'depth': 'depths',
-            'center_2d': 'centers_2d',
-            'attr_label': 'attr_labels',
-            'velocity': 'velocities',
+            "bbox_label_3d": "gt_labels_3d",
+            "bbox_label": "gt_bboxes_labels",
+            "bbox": "gt_bboxes",
+            "bbox_3d": "gt_bboxes_3d",
+            "depth": "depths",
+            "center_2d": "centers_2d",
+            "attr_label": "attr_labels",
+            "velocity": "velocities",
         }
-        instances = info['instances']
+        instances = info["instances"]
         # empty gt
         if len(instances) == 0:
             return None
@@ -235,16 +234,14 @@ class Det3DDataset(BaseDataset):
             for ann_name in keys:
                 temp_anns = [item[ann_name] for item in instances]
                 # map the original dataset label to training label
-                if 'label' in ann_name and ann_name != 'attr_label':
-                    temp_anns = [
-                        self.label_mapping[item] for item in temp_anns
-                    ]
+                if "label" in ann_name and ann_name != "attr_label":
+                    temp_anns = [self.label_mapping[item] for item in temp_anns]
                 if ann_name in name_mapping:
                     mapped_ann_name = name_mapping[ann_name]
                 else:
                     mapped_ann_name = ann_name
 
-                if 'label' in ann_name:
+                if "label" in ann_name:
                     temp_anns = np.array(temp_anns).astype(np.int64)
                 elif ann_name in name_mapping:
                     temp_anns = np.array(temp_anns).astype(np.float32)
@@ -252,9 +249,9 @@ class Det3DDataset(BaseDataset):
                     temp_anns = np.array(temp_anns)
 
                 ann_info[mapped_ann_name] = temp_anns
-            ann_info['instances'] = info['instances']
+            ann_info["instances"] = info["instances"]
 
-            for label in ann_info['gt_labels_3d']:
+            for label in ann_info["gt_labels_3d"]:
                 if label != -1:
                     self.num_ins_per_cat[label] += 1
 
@@ -275,59 +272,59 @@ class Det3DDataset(BaseDataset):
             all path has been converted to absolute path.
         """
 
-        if self.modality['use_lidar']:
-            info['lidar_points']['lidar_path'] = \
-                osp.join(
-                    self.data_prefix.get('pts', ''),
-                    info['lidar_points']['lidar_path'])
+        if self.modality["use_lidar"]:
+            info["lidar_points"]["lidar_path"] = osp.join(
+                self.data_prefix.get("pts", ""), info["lidar_points"]["lidar_path"]
+            )
 
-            info['num_pts_feats'] = info['lidar_points']['num_pts_feats']
-            info['lidar_path'] = info['lidar_points']['lidar_path']
-            if 'lidar_sweeps' in info:
-                for sweep in info['lidar_sweeps']:
-                    file_suffix = sweep['lidar_points']['lidar_path'].split(
-                        os.sep)[-1]
-                    if 'samples' in sweep['lidar_points']['lidar_path']:
-                        sweep['lidar_points']['lidar_path'] = osp.join(
-                            self.data_prefix['pts'], file_suffix)
+            info["num_pts_feats"] = info["lidar_points"]["num_pts_feats"]
+            info["lidar_path"] = info["lidar_points"]["lidar_path"]
+            if "lidar_sweeps" in info:
+                for sweep in info["lidar_sweeps"]:
+                    file_suffix = sweep["lidar_points"]["lidar_path"].split(os.sep)[-1]
+                    if "samples" in sweep["lidar_points"]["lidar_path"]:
+                        sweep["lidar_points"]["lidar_path"] = osp.join(
+                            self.data_prefix["pts"], file_suffix
+                        )
                     else:
-                        sweep['lidar_points']['lidar_path'] = osp.join(
-                            self.data_prefix['sweeps'], file_suffix)
+                        sweep["lidar_points"]["lidar_path"] = osp.join(
+                            self.data_prefix["sweeps"], file_suffix
+                        )
 
-        if self.modality['use_camera']:
-            for cam_id, img_info in info['images'].items():
-                if 'img_path' in img_info:
+        if self.modality["use_camera"]:
+            for cam_id, img_info in info["images"].items():
+                if "img_path" in img_info:
                     if cam_id in self.data_prefix:
                         cam_prefix = self.data_prefix[cam_id]
                     else:
-                        cam_prefix = self.data_prefix.get('img', '')
-                    img_info['img_path'] = osp.join(cam_prefix,
-                                                    img_info['img_path'])
+                        cam_prefix = self.data_prefix.get("img", "")
+                    img_info["img_path"] = osp.join(cam_prefix, img_info["img_path"])
             if self.default_cam_key is not None:
-                info['img_path'] = info['images'][
-                    self.default_cam_key]['img_path']
-                if 'lidar2cam' in info['images'][self.default_cam_key]:
-                    info['lidar2cam'] = np.array(
-                        info['images'][self.default_cam_key]['lidar2cam'])
-                if 'cam2img' in info['images'][self.default_cam_key]:
-                    info['cam2img'] = np.array(
-                        info['images'][self.default_cam_key]['cam2img'])
-                if 'lidar2img' in info['images'][self.default_cam_key]:
-                    info['lidar2img'] = np.array(
-                        info['images'][self.default_cam_key]['lidar2img'])
+                info["img_path"] = info["images"][self.default_cam_key]["img_path"]
+                if "lidar2cam" in info["images"][self.default_cam_key]:
+                    info["lidar2cam"] = np.array(
+                        info["images"][self.default_cam_key]["lidar2cam"]
+                    )
+                if "cam2img" in info["images"][self.default_cam_key]:
+                    info["cam2img"] = np.array(
+                        info["images"][self.default_cam_key]["cam2img"]
+                    )
+                if "lidar2img" in info["images"][self.default_cam_key]:
+                    info["lidar2img"] = np.array(
+                        info["images"][self.default_cam_key]["lidar2img"]
+                    )
                 else:
-                    info['lidar2img'] = info['cam2img'] @ info['lidar2cam']
+                    info["lidar2img"] = info["cam2img"] @ info["lidar2cam"]
 
         if not self.test_mode:
             # used in training
-            info['ann_info'] = self.parse_ann_info(info)
+            info["ann_info"] = self.parse_ann_info(info)
         if self.test_mode and self.load_eval_anns:
-            info['eval_ann_info'] = self.parse_ann_info(info)
+            info["eval_ann_info"] = self.parse_ann_info(info)
 
         return info
 
-    def _show_ins_var(self, old_labels: np.ndarray,
-                      new_labels: torch.Tensor) -> None:
+    def _show_ins_var(self, old_labels: np.ndarray, new_labels: torch.Tensor) -> None:
         """Show variation of the number of instances before and after through
         the pipeline.
 
@@ -338,23 +335,23 @@ class Det3DDataset(BaseDataset):
         ori_num_per_cat = dict()
         for label in old_labels:
             if label != -1:
-                cat_name = self.metainfo['classes'][label]
-                ori_num_per_cat[cat_name] = ori_num_per_cat.get(cat_name,
-                                                                0) + 1
+                cat_name = self.metainfo["classes"][label]
+                ori_num_per_cat[cat_name] = ori_num_per_cat.get(cat_name, 0) + 1
         new_num_per_cat = dict()
         for label in new_labels:
             if label != -1:
-                cat_name = self.metainfo['classes'][label]
-                new_num_per_cat[cat_name] = new_num_per_cat.get(cat_name,
-                                                                0) + 1
-        content_show = [['category', 'new number', 'ori number']]
+                cat_name = self.metainfo["classes"][label]
+                new_num_per_cat[cat_name] = new_num_per_cat.get(cat_name, 0) + 1
+        content_show = [["category", "new number", "ori number"]]
         for cat_name, num in ori_num_per_cat.items():
             new_num = new_num_per_cat.get(cat_name, 0)
             content_show.append([cat_name, new_num, num])
         table = AsciiTable(content_show)
         print_log(
-            'The number of instances per category after and before '
-            f'through pipeline:\n{table.table}', 'current')
+            "The number of instances per category after and before "
+            f"through pipeline:\n{table.table}",
+            "current",
+        )
 
     def prepare_data(self, index: int) -> Union[dict, None]:
         """Data preparation for both training and testing stage.
@@ -373,13 +370,13 @@ class Det3DDataset(BaseDataset):
         input_dict = copy.deepcopy(ori_input_dict)
 
         # box_type_3d (str): 3D box type.
-        input_dict['box_type_3d'] = self.box_type_3d
+        input_dict["box_type_3d"] = self.box_type_3d
         # box_mode_3d (str): 3D box mode.
-        input_dict['box_mode_3d'] = self.box_mode_3d
+        input_dict["box_mode_3d"] = self.box_mode_3d
 
         # pre-pipline return None to random another in `__getitem__`
         if not self.test_mode and self.filter_empty_gt:
-            if len(input_dict['ann_info']['gt_labels_3d']) == 0:
+            if len(input_dict["ann_info"]["gt_labels_3d"]) == 0:
                 return None
 
         example = self.pipeline(input_dict)
@@ -387,21 +384,25 @@ class Det3DDataset(BaseDataset):
         if not self.test_mode and self.filter_empty_gt:
             # after pipeline drop the example with empty annotations
             # return None to random another in `__getitem__`
-            if example is None or len(
-                    example['data_samples'].gt_instances_3d.labels_3d) == 0:
+            if (
+                example is None
+                or len(example["data_samples"].gt_instances_3d.labels_3d) == 0
+            ):
                 return None
 
         if self.show_ins_var:
-            if 'ann_info' in ori_input_dict:
+            if "ann_info" in ori_input_dict:
                 self._show_ins_var(
-                    ori_input_dict['ann_info']['gt_labels_3d'],
-                    example['data_samples'].gt_instances_3d.labels_3d)
+                    ori_input_dict["ann_info"]["gt_labels_3d"],
+                    example["data_samples"].gt_instances_3d.labels_3d,
+                )
             else:
                 print_log(
                     "'ann_info' is not in the input dict. It's probably that "
-                    'the data is not in training mode',
-                    'current',
-                    level=30)
+                    "the data is not in training mode",
+                    "current",
+                    level=30,
+                )
 
         return example
 
@@ -419,5 +420,5 @@ class Det3DDataset(BaseDataset):
             set[int]: All categories in the sample of specified index.
         """
         info = self.get_data_info(idx)
-        gt_labels = info['ann_info']['gt_labels_3d'].tolist()
+        gt_labels = info["ann_info"]["gt_labels_3d"].tolist()
         return set(gt_labels)

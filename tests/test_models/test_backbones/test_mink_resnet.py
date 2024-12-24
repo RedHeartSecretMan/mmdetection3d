@@ -2,18 +2,17 @@
 import numpy as np
 import pytest
 import torch
-
 from mmdet3d.registry import MODELS
 
 
 def test_mink_resnet():
     if not torch.cuda.is_available():
-        pytest.skip('test requires GPU and torch+cuda')
+        pytest.skip("test requires GPU and torch+cuda")
 
     try:
         import MinkowskiEngine as ME
     except ImportError:
-        pytest.skip('test requires MinkowskiEngine installation')
+        pytest.skip("test requires MinkowskiEngine installation")
 
     coordinates, features = [], []
     np.random.seed(42)
@@ -23,13 +22,11 @@ def test_mink_resnet():
         coordinates.append(c.float().cuda())
         f = torch.from_numpy(np.random.rand(500, 3))
         features.append(f.float().cuda())
-    tensor_coordinates, tensor_features = ME.utils.sparse_collate(
-        coordinates, features)
-    x = ME.SparseTensor(
-        features=tensor_features, coordinates=tensor_coordinates)
+    tensor_coordinates, tensor_features = ME.utils.sparse_collate(coordinates, features)
+    x = ME.SparseTensor(features=tensor_features, coordinates=tensor_coordinates)
 
     # MinkResNet34 with 4 outputs
-    cfg = dict(type='MinkResNet', depth=34, in_channels=3)
+    cfg = dict(type="MinkResNet", depth=34, in_channels=3)
     self = MODELS.build(cfg).cuda()
     self.init_weights()
 
@@ -45,8 +42,7 @@ def test_mink_resnet():
     assert y[3].tensor_stride[0] == 64
 
     # MinkResNet50 with 2 outputs
-    cfg = dict(
-        type='MinkResNet', depth=34, in_channels=3, num_stages=2, pool=False)
+    cfg = dict(type="MinkResNet", depth=34, in_channels=3, num_stages=2, pool=False)
     self = MODELS.build(cfg).cuda()
     self.init_weights()
 

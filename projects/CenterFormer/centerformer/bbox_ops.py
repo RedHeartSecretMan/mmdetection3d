@@ -1,7 +1,7 @@
 import torch
 from mmcv.utils import ext_loader
 
-ext_module = ext_loader.load_ext('_ext', ['iou3d_nms3d_forward'])
+ext_module = ext_loader.load_ext("_ext", ["iou3d_nms3d_forward"])
 
 
 def nms_iou3d(boxes, scores, thresh, pre_maxsize=None, post_max_size=None):
@@ -23,7 +23,7 @@ def nms_iou3d(boxes, scores, thresh, pre_maxsize=None, post_max_size=None):
         Tensor: Indexes after NMS.
     """
     # TODO: directly refactor ``nms3d`` in MMCV
-    assert boxes.size(1) == 7, 'Input boxes shape should be (N, 7)'
+    assert boxes.size(1) == 7, "Input boxes shape should be (N, 7)"
     order = scores.sort(0, descending=True)[1]
     if pre_maxsize is not None:
         order = order[:pre_maxsize]
@@ -31,8 +31,7 @@ def nms_iou3d(boxes, scores, thresh, pre_maxsize=None, post_max_size=None):
 
     keep = boxes.new_zeros(boxes.size(0), dtype=torch.long)
     num_out = boxes.new_zeros(size=(), dtype=torch.long)
-    ext_module.iou3d_nms3d_forward(
-        boxes, keep, num_out, nms_overlap_thresh=thresh)
+    ext_module.iou3d_nms3d_forward(boxes, keep, num_out, nms_overlap_thresh=thresh)
     keep = order[keep[:num_out].to(boxes.device)].contiguous()
 
     if post_max_size is not None:

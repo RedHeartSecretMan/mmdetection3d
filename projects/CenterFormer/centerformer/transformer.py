@@ -40,12 +40,9 @@ class FFN(nn.Module):
 
 class SelfAttention(nn.Module):
 
-    def __init__(self,
-                 dim,
-                 n_heads=8,
-                 dim_single_head=64,
-                 dropout=0.0,
-                 out_attention=False):
+    def __init__(
+        self, dim, n_heads=8, dim_single_head=64, dropout=0.0, out_attention=False
+    ):
         super().__init__()
         inner_dim = dim_single_head * n_heads
         project_out = not (n_heads == 1 and dim_single_head == dim)
@@ -59,19 +56,21 @@ class SelfAttention(nn.Module):
 
         self.to_out = (
             nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout))
-            if project_out else nn.Identity())
+            if project_out
+            else nn.Identity()
+        )
 
     def forward(self, x):
         _, _, _, h = *x.shape, self.n_heads
         qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)
+        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), qkv)
 
-        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+        dots = einsum("b h i d, b h j d -> b h i j", q, k) * self.scale
 
         attn = self.attend(dots)
 
-        out = einsum('b h i j, b h j d -> b h i d', attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = einsum("b h i j, b h j d -> b h i d", attn, v)
+        out = rearrange(out, "b h n d -> b n (h d)")
 
         if self.out_attention:
             return self.to_out(out), attn
@@ -100,7 +99,8 @@ class DeformableCrossAttention(nn.Module):
             n_levels,
             n_heads,
             n_points,
-            out_sample_loc=out_sample_loc)
+            out_sample_loc=out_sample_loc,
+        )
         self.dropout = nn.Dropout(dropout)
         self.out_sample_loc = out_sample_loc
 
@@ -166,40 +166,43 @@ class DeformableTransformerDecoder(nn.Module):
 
         for _ in range(depth):
             self.layers.append(
-                nn.ModuleList([
-                    PreNorm(
-                        dim,
-                        SelfAttention(
+                nn.ModuleList(
+                    [
+                        PreNorm(
                             dim,
-                            n_heads=n_heads,
-                            dim_single_head=dim_single_head,
-                            dropout=dropout,
-                            out_attention=self.out_attention,
+                            SelfAttention(
+                                dim,
+                                n_heads=n_heads,
+                                dim_single_head=dim_single_head,
+                                dropout=dropout,
+                                out_attention=self.out_attention,
+                            ),
                         ),
-                    ),
-                    PreNorm(
-                        dim,
-                        DeformableCrossAttention(
+                        PreNorm(
                             dim,
-                            dim_single_head,
-                            n_levels=n_levels,
-                            n_heads=n_heads,
-                            dropout=dropout,
-                            n_points=n_points,
-                            out_sample_loc=self.out_attention,
+                            DeformableCrossAttention(
+                                dim,
+                                dim_single_head,
+                                n_levels=n_levels,
+                                n_heads=n_heads,
+                                dropout=dropout,
+                                n_points=n_points,
+                                out_sample_loc=self.out_attention,
+                            ),
                         ),
-                    ),
-                    PreNorm(dim, FFN(dim, dim_ffn, dropout=dropout)),
-                ]))
+                        PreNorm(dim, FFN(dim, dim_ffn, dropout=dropout)),
+                    ]
+                )
+            )
 
-    def forward(self, x, pos_embedding, src, src_spatial_shapes,
-                level_start_index, center_pos):
+    def forward(
+        self, x, pos_embedding, src, src_spatial_shapes, level_start_index, center_pos
+    ):
         if self.out_attention:
             out_cross_attention_list = []
         if pos_embedding is not None:
             center_pos_embedding = pos_embedding(center_pos)
-        reference_points = center_pos[:, :,
-                                      None, :].repeat(1, 1, self.n_levels, 1)
+        reference_points = center_pos[:, :, None, :].repeat(1, 1, self.n_levels, 1)
         for i, (self_attn, cross_attn, ff) in enumerate(self.layers):
             if self.out_attention:
                 if center_pos_embedding is not None:
@@ -252,10 +255,9 @@ class DeformableTransformerDecoder(nn.Module):
             x = x_att + x
             x = ff(x) + x
 
-        out_dict = {'ct_feat': x}
+        out_dict = {"ct_feat": x}
         if self.out_attention:
-            out_dict.update({
-                'out_attention':
-                torch.stack(out_cross_attention_list, dim=2)
-            })
+            out_dict.update(
+                {"out_attention": torch.stack(out_cross_attention_list, dim=2)}
+            )
         return out_dict

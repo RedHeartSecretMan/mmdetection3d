@@ -1,7 +1,8 @@
 _base_ = [
-    '../_base_/models/pointpillars_hv_fpn_nus.py',
-    '../_base_/datasets/nus-3d.py', '../_base_/schedules/schedule-2x.py',
-    '../_base_/default_runtime.py'
+    "../_base_/models/pointpillars_hv_fpn_nus.py",
+    "../_base_/datasets/nus-3d.py",
+    "../_base_/schedules/schedule-2x.py",
+    "../_base_/default_runtime.py",
 ]
 
 # For nuScenes dataset, we usually evaluate the model at the end of training.

@@ -62,15 +62,16 @@ class MLP(nn.Module):
         in_features = self.input_dim
         for i in range(self.net_depth):
             self.hidden_layers.append(
-                nn.Linear(in_features, self.net_width, bias=bias_enabled))
-            if (self.skip_layer is not None) and (i % self.skip_layer
-                                                  == 0) and (i > 0):
+                nn.Linear(in_features, self.net_width, bias=bias_enabled)
+            )
+            if (self.skip_layer is not None) and (i % self.skip_layer == 0) and (i > 0):
                 in_features = self.net_width + self.input_dim
             else:
                 in_features = self.net_width
         if self.output_enabled:
             self.output_layer = nn.Linear(
-                in_features, self.output_dim, bias=bias_enabled)
+                in_features, self.output_dim, bias=bias_enabled
+            )
         else:
             self.output_dim = in_features
 
@@ -102,8 +103,7 @@ class MLP(nn.Module):
         for i in range(self.net_depth):
             x = self.hidden_layers[i](x)
             x = self.hidden_activation(x)
-            if (self.skip_layer is not None) and (i % self.skip_layer
-                                                  == 0) and (i > 0):
+            if (self.skip_layer is not None) and (i % self.skip_layer == 0) and (i > 0):
                 x = torch.cat([x, inputs], dim=-1)
         if self.output_enabled:
             x = self.output_layer(x)
@@ -191,8 +191,8 @@ class NerfMLP(nn.Module):
             if condition.shape[:-1] != x.shape[:-1]:
                 num_rays, n_dim = condition.shape
                 condition = condition.view(
-                    [num_rays] + [1] * (x.dim() - condition.dim()) +
-                    [n_dim]).expand(list(x.shape[:-1]) + [n_dim])
+                    [num_rays] + [1] * (x.dim() - condition.dim()) + [n_dim]
+                ).expand(list(x.shape[:-1]) + [n_dim])
             bottleneck = self.bottleneck_layer(x)
             x = torch.cat([bottleneck, condition], dim=-1)
         raw_rgb = self.rgb_layer(x)
@@ -209,12 +209,12 @@ class SinusoidalEncoder(nn.Module):
         self.max_deg = max_deg
         self.use_identity = use_identity
         self.register_buffer(
-            'scales', torch.tensor([2**i for i in range(min_deg, max_deg)]))
+            "scales", torch.tensor([2**i for i in range(min_deg, max_deg)])
+        )
 
     @property
     def latent_dim(self) -> int:
-        return (int(self.use_identity) +
-                (self.max_deg - self.min_deg) * 2) * self.x_dim
+        return (int(self.use_identity) + (self.max_deg - self.min_deg) * 2) * self.x_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.max_deg == self.min_deg:
@@ -243,13 +243,15 @@ class VanillaNeRF(nn.Module):
             Defaults to 128.
     """
 
-    def __init__(self,
-                 net_depth: int = 8,
-                 net_width: int = 256,
-                 skip_layer: int = 4,
-                 feature_dim: int = 0,
-                 net_depth_condition: int = 1,
-                 net_width_condition: int = 128):
+    def __init__(
+        self,
+        net_depth: int = 8,
+        net_width: int = 256,
+        skip_layer: int = 4,
+        feature_dim: int = 0,
+        net_depth_condition: int = 1,
+        net_width_condition: int = 128,
+    ):
         super().__init__()
         self.posi_encoder = SinusoidalEncoder(3, 0, 10, True)
         self.view_encoder = SinusoidalEncoder(3, 0, 4, True)

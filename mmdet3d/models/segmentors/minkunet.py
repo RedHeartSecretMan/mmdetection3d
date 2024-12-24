@@ -1,8 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from torch import Tensor
-
 from mmdet3d.registry import MODELS
 from mmdet3d.structures.det3d_data_sample import OptSampleList, SampleList
+from torch import Tensor
+
 from .encoder_decoder import EncoderDecoder3D
 
 
@@ -41,8 +41,7 @@ class MinkUNet(EncoderDecoder3D):
         losses = self.decode_head.loss(x, data_samples, self.train_cfg)
         return losses
 
-    def predict(self, inputs: dict,
-                batch_data_samples: SampleList) -> SampleList:
+    def predict(self, inputs: dict, batch_data_samples: SampleList) -> SampleList:
         """Simple test with single scene.
 
         Args:
@@ -71,9 +70,9 @@ class MinkUNet(EncoderDecoder3D):
 
         return self.postprocess_result(seg_logits_list, batch_data_samples)
 
-    def _forward(self,
-                 batch_inputs_dict: dict,
-                 batch_data_samples: OptSampleList = None) -> Tensor:
+    def _forward(
+        self, batch_inputs_dict: dict, batch_data_samples: OptSampleList = None
+    ) -> Tensor:
         """Network forward process.
 
         Args:
@@ -105,8 +104,8 @@ class MinkUNet(EncoderDecoder3D):
         Returns:
             SparseTensor: voxels with features.
         """
-        voxel_dict = batch_inputs_dict['voxels']
-        x = self.backbone(voxel_dict['voxels'], voxel_dict['coors'])
+        voxel_dict = batch_inputs_dict["voxels"]
+        x = self.backbone(voxel_dict["voxels"], voxel_dict["coors"])
         if self.with_neck:
             x = self.neck(x)
         return x

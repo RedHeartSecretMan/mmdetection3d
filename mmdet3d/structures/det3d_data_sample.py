@@ -140,7 +140,7 @@ class Det3DDataSample(DetDataSample):
 
     @gt_instances_3d.setter
     def gt_instances_3d(self, value: InstanceData) -> None:
-        self.set_field(value, '_gt_instances_3d', dtype=InstanceData)
+        self.set_field(value, "_gt_instances_3d", dtype=InstanceData)
 
     @gt_instances_3d.deleter
     def gt_instances_3d(self) -> None:
@@ -152,7 +152,7 @@ class Det3DDataSample(DetDataSample):
 
     @pred_instances_3d.setter
     def pred_instances_3d(self, value: InstanceData) -> None:
-        self.set_field(value, '_pred_instances_3d', dtype=InstanceData)
+        self.set_field(value, "_pred_instances_3d", dtype=InstanceData)
 
     @pred_instances_3d.deleter
     def pred_instances_3d(self) -> None:
@@ -164,7 +164,7 @@ class Det3DDataSample(DetDataSample):
 
     @pts_pred_instances_3d.setter
     def pts_pred_instances_3d(self, value: InstanceData) -> None:
-        self.set_field(value, '_pts_pred_instances_3d', dtype=InstanceData)
+        self.set_field(value, "_pts_pred_instances_3d", dtype=InstanceData)
 
     @pts_pred_instances_3d.deleter
     def pts_pred_instances_3d(self) -> None:
@@ -176,7 +176,7 @@ class Det3DDataSample(DetDataSample):
 
     @img_pred_instances_3d.setter
     def img_pred_instances_3d(self, value: InstanceData) -> None:
-        self.set_field(value, '_img_pred_instances_3d', dtype=InstanceData)
+        self.set_field(value, "_img_pred_instances_3d", dtype=InstanceData)
 
     @img_pred_instances_3d.deleter
     def img_pred_instances_3d(self) -> None:
@@ -188,7 +188,7 @@ class Det3DDataSample(DetDataSample):
 
     @gt_pts_seg.setter
     def gt_pts_seg(self, value: PointData) -> None:
-        self.set_field(value, '_gt_pts_seg', dtype=PointData)
+        self.set_field(value, "_gt_pts_seg", dtype=PointData)
 
     @gt_pts_seg.deleter
     def gt_pts_seg(self) -> None:
@@ -200,7 +200,7 @@ class Det3DDataSample(DetDataSample):
 
     @pred_pts_seg.setter
     def pred_pts_seg(self, value: PointData) -> None:
-        self.set_field(value, '_pred_pts_seg', dtype=PointData)
+        self.set_field(value, "_pred_pts_seg", dtype=PointData)
 
     @pred_pts_seg.deleter
     def pred_pts_seg(self) -> None:
@@ -209,5 +209,6 @@ class Det3DDataSample(DetDataSample):
 
 SampleList = List[Det3DDataSample]
 OptSampleList = Optional[SampleList]
-ForwardResults = Union[Dict[str, torch.Tensor], List[Det3DDataSample],
-                       Tuple[torch.Tensor], torch.Tensor]
+ForwardResults = Union[
+    Dict[str, torch.Tensor], List[Det3DDataSample], Tuple[torch.Tensor], torch.Tensor
+]

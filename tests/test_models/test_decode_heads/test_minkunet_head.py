@@ -4,7 +4,6 @@ from unittest import TestCase
 import pytest
 import torch
 import torch.nn.functional as F
-
 from mmdet3d.models.decode_heads import MinkUNetHead
 from mmdet3d.structures import Det3DDataSample, PointData
 
@@ -17,7 +16,7 @@ class TestMinkUNetHead(TestCase):
         try:
             import torchsparse
         except ImportError:
-            pytest.skip('test requires Torchsparse installation')
+            pytest.skip("test requires Torchsparse installation")
         if torch.cuda.is_available():
             minkunet_head = MinkUNetHead(channels=4, num_classes=19)
 
@@ -25,7 +24,7 @@ class TestMinkUNetHead(TestCase):
             coordinates, features = [], []
             for i in range(2):
                 c = torch.randint(0, 10, (100, 3)).int()
-                c = F.pad(c, (0, 1), mode='constant', value=i)
+                c = F.pad(c, (0, 1), mode="constant", value=i)
                 coordinates.append(c)
                 f = torch.rand(100, 4)
                 features.append(f)
@@ -40,7 +39,7 @@ class TestMinkUNetHead(TestCase):
 
             # When truth is non-empty then losses
             # should be nonzero for random inputs
-            voxel_semantic_mask = torch.randint(0, 19, (100, )).long().cuda()
+            voxel_semantic_mask = torch.randint(0, 19, (100,)).long().cuda()
             gt_pts_seg = PointData(voxel_semantic_mask=voxel_semantic_mask)
 
             datasample = Det3DDataSample()
@@ -48,7 +47,8 @@ class TestMinkUNetHead(TestCase):
 
             gt_losses = minkunet_head.loss(x, [datasample, datasample], {})
 
-            gt_sem_seg_loss = gt_losses['loss_sem_seg'].item()
+            gt_sem_seg_loss = gt_losses["loss_sem_seg"].item()
 
-            self.assertGreater(gt_sem_seg_loss, 0,
-                               'semantic seg loss should be positive')
+            self.assertGreater(
+                gt_sem_seg_loss, 0, "semantic seg loss should be positive"
+            )
